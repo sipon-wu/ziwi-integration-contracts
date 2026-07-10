@@ -133,6 +133,74 @@
 | 私有部署认证 | 运营用户完全本地 IdP；管理员+财务员走 cloud；离线 License（内嵌 cloud 公钥） |
 | ✅ 服务端阈值（H5 已闭环） | heartbeat.ziwi.cn 已通过 `.env`+`docker-compose.yml` 注入 `HEARTBEAT_CHECK_INTERVAL_MINUTES=60` / `HEARTBEAT_TIMEOUT_MINUTES=60` / `HEARTBEAT_OFFLINE_THRESHOLD_MISSES=24`（纯 env 覆盖，未改源码），重启后容器内 env 与启动日志（`check_interval=60 min`）已核验生效；客户端按 1h 上报不再误判，连续 24 次失败≈24h 才标记失联，与基线一致 |
 
+### D.1 心跳上报客户端 SDK（mfg 已实现）
+
+> 位置：`code/heartbeat/client/`（与心跳服务端同仓 ziwi_mfg，低优先级模块补全）。本 SDK 供私有部署侧（如 mfg/school/ecms）一行挂载即可按 D 节基线自动上报心跳；**离线判定与告警仍由服务端负责**（见 D 节），客户端只管「每小时发一次」。💻✅
+
+**代码位置与文件结构**
+
+| 文件 | 说明 | 证据 |
+|---|---|---|
+| `client/__init__.py` | 导出 `HeartbeatClient`、`HeartbeatClientConfig`、`create_heartbeat_lifespan` | 💻 |
+| `client/config.py` | `HeartbeatClientConfig(BaseSettings)`，env 前缀 `HEARTBEAT_` | 💻 |
+| `client/heartbeat_client.py` | 核心 `HeartbeatClient`（调度 + 上报 + 重试） | 💻 |
+| `client/fastapi_integration.py` | `create_heartbeat_lifespan()` | 💻 |
+| `client/requirements.txt` | httpx / apscheduler / pydantic-settings | 💻 |
+| `client/tests/` | 15 个用例（15/15 通过） | 💻✅ |
+| `client/README.md` | 用法 + `HEARTBEAT_*` 配置清单 | 💻 |
+
+**配置项（`HEARTBEAT_` 前缀，全部来自 env）**
+
+| env 名 | 默认值 | 含义 |
+|---|---|---|
+| `HEARTBEAT_SERVER_URL` | `https://heartbeat.ziwi.cn` | 心跳服务端地址 |
+| `HEARTBEAT_API_KEY` | （无默认，必填） | cloud 签发 API Key，用作请求头 `X-Api-Key` |
+| `HEARTBEAT_DEPLOYMENT_ID` | （无默认，必填） | 部署实例唯一标识 |
+| `HEARTBEAT_TENANT_ID` | （无默认，必填） | 所属租户 |
+| `HEARTBEAT_PRODUCT` | （无默认，如 `mfg`） | 产品标识 |
+| `HEARTBEAT_VERSION` | （无默认） | 部署版本号 |
+| `HEARTBEAT_LICENSE_ISSUED_AT` | （无默认） | License 签发时间，**首次上报必带** |
+| `HEARTBEAT_LICENSE_EXPIRES_AT` | （无默认） | License 到期时间，**首次上报必带** |
+| `HEARTBEAT_INTERVAL_SECONDS` | `3600`（=1h） | 上报周期，对齐 D 节 1h 基线 |
+| `HEARTBEAT_MAX_RETRIES` | `3` | 失败最大重试次数 |
+| `HEARTBEAT_RETRY_BACKOFF_SECONDS` | `10` | 重试退避基数（指数退避） |
+| `HEARTBEAT_REQUEST_TIMEOUT` | `10` | 单次请求超时（秒） |
+
+**接入方式**
+
+- FastAPI 一行挂载（推荐）：
+
+```python
+from heartbeat.client import create_heartbeat_lifespan
+from fastapi import FastAPI
+
+app = FastAPI(lifespan=create_heartbeat_lifespan())
+```
+
+- 最小独立用法：
+
+```python
+from heartbeat.client import HeartbeatClient, HeartbeatClientConfig
+
+cfg = HeartbeatClientConfig()      # 读取 HEARTBEAT_* env
+client = HeartbeatClient(cfg)
+client.start()                     # 立即首发一次 + 调度周期上报（IntervalTrigger，默认 1h）
+# ... 应用运行 ...
+client.stop()
+```
+
+**与 D 节基线的对应关系**
+
+| 维度 | 客户端职责 | 服务端职责 |
+|---|---|---|
+| 上报频率 | 每 `INTERVAL_SECONDS`（默认 3600s=1h）上报一次；`start()` 立即首发一次，调度用 `IntervalTrigger(seconds=interval_seconds)` 💻✅ | — |
+| License 首报 | **首次上报必带 `license_issued_at` + `license_expires_at`**（缺失则 400）；未注册实例被 400 时自动补带 license 重试一次 💻✅ | 校验 license 字段，缺失返回 400 |
+| 失败重试 | 按 `MAX_RETRIES` + 指数退避重试；**无论成败都不抛未捕获异常**，返回 `{"status":"error","detail":...}` + 日志告警（降级原则：实例照常运行）💻✅ | — |
+| 离线判定 / 告警 | 不负责（连续 24h 无心跳才判 offline，由服务端算） | **连续 24h 无成功心跳 → 标失联 + 告警 + 降级**（见 D 节）📄 |
+| 生命周期 | `start()`/`stop()` 幂等；`create_heartbeat_lifespan()` 可一行挂进 FastAPI 💻✅ | — |
+
+> ✅ **验证**：`client/tests/` 15/15 用例通过；真实 `BackgroundScheduler` 实证周期心跳多次触发（5 秒窗口内触发 5 次）；QA 独立 Round 2 回归 `IS_PASS=YES`。
+
 ---
 
 ## E. 基础设施
@@ -178,6 +246,7 @@
 - [x] F 错误码已定义
 - [x] v0.2 `features` vs `products` 字段差异已统一（products 为主，v0.3 闭环）
 - [x] 心跳频率/失联判定已与《补充需求书合集》§6.2 对齐（1h / 24h，v0.3 闭环）
+- [x] D.1 心跳上报客户端 SDK 已实现并验证（code/heartbeat/client/，15/15 测试通过，真实调度器周期触发已实证）💻✅
 
 ---
 
