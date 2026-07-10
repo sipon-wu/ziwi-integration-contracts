@@ -31,3 +31,4 @@
 ## 登记表
 
 实际追加在 **`变更记录.md`**（不要改本文件）。
+| 2026-07-10 | mfg | 新增 `mfg1.ziwi.cn` nginx 443 vhost，反代 `127.0.0.1:8092`，复用 `*.ziwi.cn_ecc` 通配符证书 | 共享 nginx `sites-enabled/`，DNS 新增 A 记录 | nginx + 域名 | Deployed → Affected-Confirmed | school / ecms |
