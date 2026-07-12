@@ -94,6 +94,8 @@
 
 ## 六、必踩坑清单（避免重复踩）
 
+> school 专属坑见下；**跨项目 CVM 通用坑**（部署副本分离、只读 github key、容器名冲突、探针路径纪律、完成门槛）见 `CVM部署通用规范与坑清单.md`。
+
 | # | 坑 | 正确做法 |
 |---|----|---------|
 | 1 | 后端改了代码，staging 没生效 | 后端容器本地编译，**先 rsync 源码到服务器 `/opt/zhiwei/code/backend`** 再 `up --build` |
@@ -106,6 +108,7 @@
 | 8 | school1 原仅 80，Chrome 自动 HTTPS 升级被全机 443 接走显示知微云，真人进不去 | 已建 `school1.ziwi.cn.ssl`（listen 443，复用 `*.ziwi.cn_ecc`，反代 `:8081`） |
 | 9 | 误清 prod 数据 | prod 数据清洗需明确指令；staging/prod 库名隔离 |
 | 10 | cloud 对接 staging 验证不充分 | 已验证 P0/P1（commit `d3b4518`、`68e383f`）；接 cloud 用 `CloudJWKSURL` 配置 |
+| 11 | rsync 排除规则误伤源码：`--exclude='server'` 排除所有含 `server` 路径分量的目录（含 `cmd/server/`），新端点 404 | exclude 锚定传输根 `--exclude='/server'`；改完 `cmd/server/` 后确认排除规则不漏（详见 `CVM部署通用规范与坑清单.md` G5） |
 
 ---
 
@@ -133,3 +136,4 @@
 - **部署变更生命周期**：`../流程闭环/状态迁移与移交规范_V1.md` 第三章 —— nginx/SSL 改动强制闭环
 - **测试左移与用例**：`../测试标准/AI测试Agent约束指南.md` + `QA_从严回测用例集_V1.md`
 - **接口契约（接入 cloud）**：`../contracts/` 或 `../测试标准/school接入cloud接口契约模板.md`
+- **跨项目 CVM 通用坑与权限模型**：`CVM部署通用规范与坑清单.md`（部署副本分离、只读 github key、容器名冲突、探针路径纪律、完成门槛 DoD）
