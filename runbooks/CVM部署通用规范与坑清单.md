@@ -27,7 +27,7 @@
 | school | `/opt/zhiwei/code` | docker compose（`zhiwei` / `zhiwei-staging`） | 后端本地编译；后端改动须 rsync 到 `/opt/zhiwei/code/backend` 再 `up --build`；staging 必须 `--env-file .env.staging` |
 | mfg | `/opt/ziwi/mfg` | docker compose（`deploy/docker-compose.yml`，service `mfg-backend`，`container_name: mfg1-backend`） | 见第三节「部署副本分离」+ `deploy.sh` |
 | ecms | `/var/www/ecms` + 后端 systemd | 前端 dist + FastAPI systemd（崩溃自拉） | 前端 `base` 根路径；后端 systemd 托管 |
-| cloud | `/opt/cloud-idp` | FastAPI + systemd + **alembic 自动迁移** | 短链路、自动迁移，最稳 |
+| cloud | `/opt/cloud-idp` | FastAPI + systemd + **alembic 自动迁移** | 短链路、自动迁移，最稳；**代码仓 `sipon-wu/ziwi_cloud`（独立，2026-08-12 建）**；CVM 仅本地 git，GitHub 同步经 Mac 枢纽 rsync+push（见 G3） |
 | heartbeat | `/opt/heartbeat` | 复用 cloud 同后端 + 独立 docker-compose / nginx 反代 | 无独立代码，独立域名反代 |
 
 ---
@@ -54,6 +54,12 @@
 | G1 | `git pull` 只更新 git 跟踪目录，容器跑的是另一份部署副本（如 mfg 的 `deploy/backend/`）→ 对齐无效 | 部署副本必须 rsync 同步；固化成 `deploy.sh`，**禁止只 pull** |
 | G2 | `docker compose up` 默认按 `depends_on` 重建依赖服务（如 db），触发容器名冲突、搞挂 staging | 重建单服务用 `docker compose up -d --no-deps <service>`；`container_name` 固定时先 `docker rm -f <container_name>` |
 | G3 | CVM 上 github key 只读，误在 CVM `git push` 报 `read only` | push 只能从 Mac（写 key）执行；CVM 仅 pull |
+
+> **cloud 专属 git 工作流（方案 A，2026-08-12 codebuddy 落地）**：CVM `/opt/cloud-idp/backend` 只建**本地 git**（版本保护），**不直连 GitHub**。同步到 `ziwi_cloud` 仓的链路：
+> 1. CVM 改码 → `git add <具体路径>`（**禁 `git add -A`**）→ `git commit`（本地）
+> 2. Mac 侧：`rsync -az --delete --exclude='.venv' --exclude='keys' --exclude='cloud_local.db' --exclude='__pycache__' root@193.112.163.147:/opt/cloud-idp/backend/ /Users/sipon/CodeBuddy/ziwi_cloud/`
+> 3. Mac 侧：`cd /Users/sipon/CodeBuddy/ziwi_cloud && git add <路径> && git commit && git push origin main`
+> 安全：`keys/`、`*.pem` 私钥、`.venv`、`cloud_local.db` 均被 `.gitignore` 排除，入库仅 `test_keys/key_v1_public.pem`（公钥）。workbuddy 可在 CVM 改码+本地 commit，但**不要在 CVM push**（无 key），进 GitHub 由 Mac 枢纽负责。
 | G4 | 验证探针路径错：打 `/wms/locations` 实则 `/api/v1/wms/locations`，误报 404「端点缺失」 | 探针必须按真实路由前缀打；任何「404 缺失」先核对源码路由前缀再下结论 |
 | G5 | rsync 排除规则误伤源码：`--exclude='server'` 排除所有含 `server` 路径分量的目录（含 `cmd/server/`），新端点 404 | exclude 锚定传输根：`--exclude='/server'`；改完 `cmd/server/` 后确认排除不漏 |
 | G6 | 手搓 `docker compose` 漏 `--env-file`/`--build`/`--no-deps` → 连错库、没重编、网络没挂 | 部署只走固化脚本（`deploy.sh` / `deploy.sh staging`），禁手搓 |

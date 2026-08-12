@@ -6,6 +6,14 @@
 > 填写人身份：知微制造（mfg.ziwi.cn）团队 — 对接负责人
 > 证据标注：✅ = 线上实测确认；📄 = cloud 源码/设计文档依据；💻 = mfg 代码已实现
 
+> ### ⚠️ 归属变更提示（续写脉络，不覆盖原填写人）
+> - **2026-07-27 用户拍板**：cloud（IdP）与 License 线的后续研发/部署由 **codebuddy（Mac 侧）** 接管，自 workbuddy 移回（见 `STATUS.md` cloud/license 行）。
+> - **2026-08-11~12 codebuddy 完成的基础变更**（基于本契约既有脉络续写）：
+>   1. cloud 后端建**独立 GitHub 仓** `sipon-wu/ziwi_cloud`（此前游离态运行于 CVM `/opt/cloud-idp/backend`）；
+>   2. CVM 上 cloud 后端**接本地 git**（版本保护），GitHub 同步走**方案 A**：CVM 不直连 GitHub，经 Mac 枢纽 rsync + push（与 `../runbooks/CVM部署通用规范与坑清单.md` G3 坑一致）；
+>   3. **心跳服务端已实现**：cloud 后端新增 `POST /api/v1/heartbeat`（实例用 license_key 自证）与 `GET /api/v1/instances/heartbeats`（平台角色查看在线），实测 ecms-dna 上报成功（详见 §D）。
+> - 本契约标题虽写「mfg 接入 cloud」，实为 **cloud 主契约**（mfg/school/ecms 皆接入方）；workbuddy 原始署名与基线保留不动。
+
 ---
 
 ## A. 鉴权对接
@@ -116,7 +124,7 @@
 | 用户在某产品内的角色（如 tenant_admin） | 走各产品本地租户角色体系（mfg 已有），不依赖 JWT products |
 | License 到期日 | 走 License 服务/DB，不塞进 JWT |
 | 403 错误体 | `{"detail":"Forbidden"}` |
-| 当前 License 状态 | Phase 1 无硬 License 校验 |
+| 当前 License 状态 | Phase 1 无硬 License 校验（预留查询/同步接口见 §I，Phase 2 落地） |
 
 ---
 
@@ -201,6 +209,20 @@ client.stop()
 
 > ✅ **验证**：`client/tests/` 15/15 用例通过；真实 `BackgroundScheduler` 实证周期心跳多次触发（5 秒窗口内触发 5 次）；QA 独立 Round 2 回归 `IS_PASS=YES`。
 
+### D.4 codebuddy 续写：服务端已实现（2026-08-11~12）
+
+> 基于本契约 D 节基线，codebuddy 在 cloud 后端（`/opt/cloud-idp/backend`，仓 `ziwi_cloud`）**落地了心跳服务端**，与 D.1~D.3 客户端 SDK 互补形成闭环。
+
+| 项 | 实现值 |
+|---|---|
+| 上报端点 | `POST /api/v1/heartbeat`（实例用 `license_key` 自证身份，cloud 验签确认 tenant，无需平台 token）📄✅ |
+| 查询端点 | `GET /api/v1/instances/heartbeats`（平台角色鉴权，返回各私有化实例 online/last_heartbeat_at）📄✅ |
+| 在线判定 | ≤600s（10 分钟）内有心跳为 `online`（上报频率建议 5 分钟）📄 |
+| 数据模型 | `InstanceHeartbeat` 表（`tenant_id` + `instance_domain` 唯一约束，upsert 更新 `last_seen_at`）📄 |
+| 实测 | ecms-dna 实例上报成功，`instances/heartbeats` 返回 `online: true` ✅ |
+
+**设计要点（通用性）**：实例仅凭 `license_key` 自证，cloud 验签后 upsert，**任何 product 的私有化实例零改动即可上报**；对接方（如 mfg/ecms）只要持有本契约 D.1~D.3 的 `HeartbeatClient` 即可接入，无需额外服务端改动。
+
 ---
 
 ## E. 基础设施
@@ -247,6 +269,7 @@ client.stop()
 - [x] v0.2 `features` vs `products` 字段差异已统一（products 为主，v0.3 闭环）
 - [x] 心跳频率/失联判定已与《补充需求书合集》§6.2 对齐（1h / 24h，v0.3 闭环）
 - [x] D.1 心跳上报客户端 SDK 已实现并验证（code/heartbeat/client/，15/15 测试通过，真实调度器周期触发已实证）💻✅
+- [ ] I. License 查询与同步接口（预留 · Phase 2）：`GET /api/v1/tenants/{tenant_id}/licenses` + mfg 本地字段 + 心跳同步机制，契约已登记、实现待 cloud License 服务（Phase 2）就绪 📄
 
 ---
 
@@ -264,6 +287,54 @@ client.stop()
 
 ---
 
+## I. License 查询与同步接口（预留 · Phase 2）
+
+> 背景：2026-07-27 用户拍板（方案 B）——`license_exp` **不进 cloud JWT**，License 权威源 = cloud **License 服务/DB**（Phase 2 待建），各产品线本地 License 字段为运行时判据 + 私有部署/断网兜底。本节约等于「把 mfg（知微智造）将来向 cloud 取 License 的接口先预留好」，待 cloud License 服务建成即可直接对接，无需重谈契约。
+> 状态：📄 设计预留，**当前全部未实现**（cloud 侧返回 501 Not Implemented，mfg 本地字段由 §D.1 心跳首报 + License 文件写入作过渡）。与 school 侧 `账户权限计费联动技术方案_cloud+license.md` v1.1「双锚点」模型一致。
+
+### I.1 cloud 侧 License 查询端点（预留）
+
+| 项 | 值 |
+|---|---|
+| 端点 | `GET /api/v1/tenants/{tenant_id}/licenses` |
+| 认证 | `Bearer <cloud JWT>`（须含 `products` 含 `mfg`）**或** `X-Api-Key`（服务间，同 D 节心跳 Key） |
+| 路径参数 | `tenant_id`（mfg 用 `mfg_*` 前缀，见 B.3） |
+| 查询参数 | `product`（可选，默认返回该租户全部产品；单查传 `product=mfg`）；`campus`（可选，多校区粒度，待拍板） |
+| 当前实现 | 📄 **501 Not Implemented**（cloud License 服务/DB Phase 2 待建） |
+| 规划响应体 | `{"data":[{"product":"mfg","status":"active|trial|expired|suspended","issued_at":<unix>,"expires_at":<unix>,"plan":"<套餐码>","seats":<int>,"modules":["<模块码>"]}]}` |
+| 错误态 | 401 未认证 / 403 tenant_id 与 JWT 不符 / 404 租户无 License 记录 / 501 服务未就绪 |
+
+> 字段说明：`status` 与 mfg 本地 `license_status` 枚举对齐；`modules` 与 §C `feature_flags`（模块级权限）同源但**不强制耦合**——模块权限仍走 mfg 本地 `tenants.package_modules`，本接口只同步「License 维度」状态。
+
+### I.2 mfg 侧本地 License 字段（预留，与 §D.1 衔接）
+
+| 本地字段（预留名） | 类型 | 来源（过渡期→Phase 2） |
+|---|---|---|
+| `license_status` | enum | §D.1 心跳首报 `license_issued_at/expires_at` 推演 → Phase 2 改由 I.3 同步回写 |
+| `license_issued_at` | int(unix) | 心跳首报 `HEARTBEAT_LICENSE_ISSUED_AT`（D.1） |
+| `license_expires_at` | int(unix) | 心跳首报 `HEARTBEAT_LICENSE_EXPIRES_AT`（D.1） |
+| `license_plan` | string | 私有部署 License 文件 / Phase 2 同步 |
+| `license_seats` | int | License 文件 / Phase 2 同步 |
+| `license_modules` | array\<string\> | License 文件 / Phase 2 同步 |
+
+> mfg 现有占位端点 `/system/license` 在 Phase 2 升级为「读本地字段 + 必要时触发 I.1 拉取刷新」，语义不变、调用方无感。
+
+### I.3 同步机制（预留）
+
+- **倾向心跳拉取**（与 D 节同域 `heartbeat.ziwi.cn`）：Phase 2 把心跳 SDK（D.1）升级为「上报 + 回拉 License 快照」，把 I.1 返回值写回 I.2 本地字段。
+- **私有部署/断网兜底**：本地字段独立生效（License 文件 + 心跳首报），cloud 不可达时门禁不降级。
+- **待拍板**：webhook 主动推送 vs 心跳拉取（当前倾向心跳，域名已规划；与 school 侧 §3.5 待拍板项合并决策）。
+
+### I.4 校验落点（运行时门禁，与 school 同构）
+
+- 运行时 License 门禁 = mfg 本地 `license_status` + `license_expires_at`（读到即判、即时生效，不受 token 生命周期拖累）。
+- I.1 端点仅作「权威源刷新通道」，不参与每次鉴权（避免每次请求多一次网络调用）。
+- 模块级权限（`feature_flags`）仍走 mfg 本地 `tenants.package_modules`，不依赖本接口。
+
+> 预留接口总原则：身份（JWT products）/ 角色（本地）/ License（本地字段 + I.1 同步）三者职责分离，与 v0.3 基线及 2026-07-27 拍板一致。
+
+---
+
 ## 参考：cloud API 清单
 
 | 端点 | 方法 | 说明 | 认证 |
@@ -275,4 +346,5 @@ client.stop()
 | `/api/v1/auth/logout` | POST | 登出 | 是 |
 | `/api/v1/auth/change-password` | POST | 修改密码 | 是 |
 | `/api/v1/auth/public-key` | GET | RSA 公钥 JWK | 否 |
+| `/api/v1/tenants/{tenant_id}/licenses` | GET | **License 查询（预留 · Phase 2 未实现，当前 501）** | 是 / X-Api-Key |
 | `/health` | GET | 健康检查 | 否 |

@@ -5,7 +5,7 @@
 | 项目 | 状态 | 归属 | 最近进展 | 待办 |
 |------|------|------|---------|------|
 | mfg (WMS) | 已移交·自闭环就绪 | workbuddy | 2026-07-12 方案 A 完成：workbuddy 获 CVM root SSH key + `deploy.sh` 推 github `c21bc65`；预发布已对齐 `origin/main 336899f`（含 N3 修复）、`mfg1-backend` healthy、DB 未动 | workbuddy 自验 key 连通性 + `./deploy.sh` 跑通；闭环 N5 过账/流水（真 token + 对账探针）；修探针路径 `/wms/*`→`/api/v1/wms/*`；过 GATE 后置 `Released` |
-| cloud / license 线 | 归属变更·方案已对齐 + **代码仓独立化** | **codebuddy**（2026-07-27 用户拍板，自 workbuddy 移回） | 2026-07-27 完成三方对齐（详见下方决策记录）：school 侧两篇方案修订至 v0.6/v1.1，mfg 仓 v0.2 草案标记过时；**mfg 接入 cloud 契约新增 §I「License 查询与同步接口（预留·Phase 2）」**（`GET /api/v1/tenants/{tenant_id}/licenses` + 本地字段 + 心跳同步机制）。**2026-08-12 追加**：cloud 后端建独立 GitHub 仓 `sipon-wu/ziwi_cloud`（原游离态 CVM `/opt/cloud-idp/backend` 已接本地 git + 备份 + 推送）；协同规范见 `contracts/cloud仓库协同与部署规范.md`（方案 A：CVM 不直连 GitHub，同步经 Mac 枢纽） | cloud License 服务/DB（Phase 2）建设；§I 接口落地实现；License 同步通道（webhook vs 心跳）待拍板 |
+| cloud / license 线 | 归属变更·方案已对齐 + **代码仓独立化** | **codebuddy**（2026-07-27 用户拍板，自 workbuddy 移回） | 2026-07-27 完成三方对齐（详见下方决策记录）：school 侧两篇方案修订至 v0.6/v1.1，mfg 仓 v0.2 草案标记过时；**mfg 接入 cloud 契约新增 §I「License 查询与同步接口（预留·Phase 2）」**（`GET /api/v1/tenants/{tenant_id}/licenses` + 本地字段 + 心跳同步机制）。**2026-08-12 追加**：cloud 后端建独立 GitHub 仓 `sipon-wu/ziwi_cloud`（原游离态 CVM `/opt/cloud-idp/backend` 已接本地 git + 备份 + 推送）；**续写脉络**（不另起山头）：归属变更与 2026-08 进展见 `contracts/mfg接入cloud接口契约.md` 头部「⚠️ 归属变更提示」+ §D.4 心跳服务端实现；git 工作流（方案 A）落到 `runbooks/CVM部署通用规范与坑清单.md` G3 坑下 | cloud License 服务/DB（Phase 2）建设；§I 接口落地实现；License 同步通道（webhook vs 心跳）待拍板 |
 
 ## 今日服务器策略沉淀（已推 github `a3959f8`，workbuddy 须 pull）
 - 新建 `runbooks/CVM部署通用规范与坑清单.md`：权限模型 / 部署副本分离 / 只读 github key / 容器名冲突 / 探针路径纪律 / 完成门槛 DoD
@@ -17,7 +17,7 @@
 
 **归属变更**：cloud（IdP，独立部署于 CVM `/opt/cloud-idp/backend`，代码仓 `sipon-wu/ziwi_cloud`）与 license 线的后续工作由 codebuddy 接管（用户 2026-07-27 指令）；WMS 业务线仍归 workbuddy。
 
-> **2026-08-12 修正**：旧述"源码在 `ziwi_mfg/cloud/`"已过时。cloud 后端实际独立于 mfg，现已有专属仓 `ziwi_cloud`，协同规范见 `contracts/cloud仓库协同与部署规范.md`。
+> **2026-08-12 修正**：旧述"源码在 `ziwi_mfg/cloud/`"已过时。cloud 后端实际独立于 mfg，现已有专属仓 `sipon-wu/ziwi_cloud`；续写均落在 workbuddy 既有契约（`contracts/mfg接入cloud接口契约.md`）与 runbook（`runbooks/CVM部署通用规范与坑清单.md`）脉络上。
 
 **根决策（方案 B）**：`license_exp` **不进 cloud JWT**——维持 v0.3 契约（`contracts/mfg接入cloud接口契约.md` §A.2/H2）与 cloud 源码现状（`jwt_service.py` 只签 `sub/email/tenant_id/products[]/iat/exp`）。理由：License 变更须即时生效（JWT 30min 生命周期拖慢）、JWT 精瘦、身份与计费分离（行业主流）。
 
