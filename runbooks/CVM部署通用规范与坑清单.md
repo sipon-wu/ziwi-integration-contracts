@@ -65,6 +65,7 @@
 | G6 | 手搓 `docker compose` 漏 `--env-file`/`--build`/`--no-deps` → 连错库、没重编、网络没挂 | 部署只走固化脚本（`deploy.sh` / `deploy.sh staging`），禁手搓 |
 | G7 | 验证「接口 200 即绿」放行，隐性闭环（对账/过账/流水）漏验 | 把「业务对账探针」升为交付闸门；涉及「账」的模块没跑过收/发/出对账不算 done |
 | G8 | 跨环境责任断裂：workbuddy 开发 paper-green 即报 done，问题溢出到 CVM 才救火 | 共享仓 SOP 为共同契约；进入 `Ready-for-QA` 前强制读部署坑清单 + GATE；状态进 `STATUS.md` |
+| G9 | **双源混乱**：CVM 现场 md 与 GitHub 协同契约同主题并存，双方各看各的、互相盲区 | **GitHub 协同仓为唯一真相源**；上 CVM 操作前必须先读 GitHub 协同文件并消化最新变化（STATUS.md + 相关契约/runbook）。CVM 上对接类旧 md 一律删除、不回流 GitHub（详见 STATUS.md 铁律）。2026-08-12 已清：`/opt/ziwi/mfg/docs/` 下 `cloud-jwt-integration-guide.md` / `multi-product-platform-integration.md` / `school接入cloud接口契约模板.md`，及 `/opt/heartbeat/INTEGRATION.md` / `产品规格.md` |
 
 > school 专属坑（env-file、nginx `/ai/` 抢匹配、`listen_addresses`、Docker Hub 被墙、证书等）见 `school双环境部署工作流.md` 第六节。
 
