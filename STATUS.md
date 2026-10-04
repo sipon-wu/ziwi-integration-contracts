@@ -12,6 +12,7 @@
 |------|------|------|---------|------|
 | mfg (WMS) | 已移交·自闭环就绪 | workbuddy | 2026-07-12 方案 A 完成：workbuddy 获 CVM root SSH key + `deploy.sh` 推 github `c21bc65`；预发布已对齐 `origin/main 336899f`（含 N3 修复）、`mfg1-backend` healthy、DB 未动 | workbuddy 自验 key 连通性 + `./deploy.sh` 跑通；闭环 N5 过账/流水（真 token + 对账探针）；修探针路径 `/wms/*`→`/api/v1/wms/*`；过 GATE 后置 `Released` |
 | cloud / license 线 | 归属变更·方案已对齐 + **代码仓独立化** + **双源清理** | **codebuddy**（2026-07-27 用户拍板，自 workbuddy 移回） | 2026-07-27 完成三方对齐（详见下方决策记录）：school 侧两篇方案修订至 v0.6/v1.1，mfg 仓 v0.2 草案标记过时；**mfg 接入 cloud 契约新增 §I「License 查询与同步接口（预留·Phase 2）」**（`GET /api/v1/tenants/{tenant_id}/licenses` + 本地字段 + 心跳同步机制）。**2026-08-12 追加**：cloud 后端建独立 GitHub 仓 `sipon-wu/ziwi_cloud`（原游离态 CVM `/opt/cloud-idp/backend` 已接本地 git + 备份 + 推送）；**续写脉络**（不另起山头）：归属变更与 2026-08 进展见 `contracts/mfg接入cloud接口契约.md` 头部「⚠️ 归属变更提示」+ §D.4 心跳服务端实现；git 工作流（方案 A）落到 `runbooks/CVM部署通用规范与坑清单.md` G3 坑下。**2026-08-12 双源清理**（铁律落地）：CVM 上已被 GitHub 契约取代的对接类旧 md 已删除——`/opt/ziwi/mfg/docs/` 下 `cloud-jwt-integration-guide.md` / `multi-product-platform-integration.md` / `school接入cloud接口契约模板.md`，及 `/opt/heartbeat/INTEGRATION.md` / `产品规格.md`；mfg 自身业务文档（产品规格/架构/WMS 等）保留未动 | cloud License 服务/DB（Phase 2）建设；§I 接口落地实现；License 同步通道（webhook vs 心跳）待拍板 |
+| SSL 证书统一管理 | 已收口·自动续期恢复 | workbuddy | 2026-10-04：①通配符 `*.ziwi.cn` DNS-01 续期链路修复（旧 Tencent Key 变量名错配致 12-06 必断，已修正 account.conf 密钥命名并强制续期，到期延至 2027-01-02）；②全站证书合并收口（通配符 SAN 扩含 `*.ecms.ziwi.cn` 覆盖 dna.ecms，删除 ecms/mfg/school/dna.ecms/apex 共 5 张独立证，续期对象 7→2，均先备份） | 商用 apex `ziwi.cn` 2026-11-04 到期待续（用户"到时候再说"）；已登记 deploy-log 待 codebuddy(mfg/ecms/school) 确认 |
 
 ## 今日服务器策略沉淀（已推 github `a3959f8`，workbuddy 须 pull）
 - 新建 `runbooks/CVM部署通用规范与坑清单.md`：权限模型 / 部署副本分离 / 只读 github key / 容器名冲突 / 探针路径纪律 / 完成门槛 DoD
@@ -37,3 +38,31 @@
 - school 仓 `产品规划/账户系统与cloud.ziwi.cn对接方案.md` → v0.6（修正 §1.4/§3.3/§3.4/§3.5/§12 残留 v0.1 旧写法）
 - school 仓 `产品规划/账户权限计费联动技术方案_cloud+license.md` → v1.1（锚点改为 JWT 身份锚点 + License 服务锚点双轨）
 - mfg 仓 `docs/账户系统与cloud.ziwi.cn对接方案.md`（v0.2 草案）→ 顶部标记「已过时，仅存档」
+
+## SSL 证书运维台账（2026-10-04，WorkBuddy / Kane 授权）
+
+> 影响 cloud.ziwi.cn（codebuddy 接管域）：仅修复共享通配符证书基础设施 + 合并收口，SAN 仍覆盖 `*.cloud.ziwi.cn`，未动 cloud 任何代码/配置。变更登记见 `deploy-log/变更记录.md` 两行（状态 Deployed，待确认）。
+
+### 一、cloud.ziwi.cn 短信告警 → 通配符 DNS-01 续期链路修复
+- **触发**：Kane 收到 cloud.ziwi.cn SSL"快到期"短信。排查确认对外服务为通配符 `*.ziwi.cn`（SAN 含 `*.cloud.ziwi.cn`），当时到期 2026-12-06。
+- **根因（致命）**：`dns_tencent.py` 读 `Tencent_SecretId/Key`，而 `account.conf` 中旧 `export Tencent_SecretId/Key` 装的是 2026-09-07 已停用 Key；新 Key 被 `rotate_tencent_key.sh` 误写成 `SAVED_TENCENT_SECRETID/KEY`（无人读）→ 续期报 `The SecretId is not found`，12-06 必断（cloud/mfg/school 全部子域 HTTPS 一起挂）。
+- **处置**：修正 account.conf 密钥命名（新 Key → `Tencent_SecretId/Key` + `SAVED_Tencent_SecretId/Key`，删错误行，600 权限，操作前已备份 `account.conf.bak.*`）；强制续期成功，到期 **2026-12-06 → 2027-01-02**，Reload 成功，Server 酱推送。ARI 下次续期窗口 2026-12-03（cron 每日 21:49 `--cron` 自动执行）。
+- **根治**：修正 `rotate_tencent_key.sh`（本机 + 服务器 `/usr/local/bin/`），下次轮换写对变量名并清理全部旧命名。
+
+### 二、全站 SSL 证书合并收口
+- **背景**：通配符原 SAN 不含 `*.ecms.ziwi.cn` → ecms/mfg/school 三张独立证冗余（webroot 模式正是 9/10 月续期失败根因）、dna.ecms 独立证（11-09 仅 36 天）为缺口；另有多处死证/死文件。
+- **执行**：重签通配符（SAN 增 `*.ecms.ziwi.cn`，仍落 `*.ziwi.cn_ecc`，路径不变）；4 个 vhost（ecms/mfg/school/dna.ecms）证书路径改指通配符（备份 `/root/nginx_conf_backup/*.bak.20261004123235`）；`nginx -t` + `nginx -s reload`（注：`systemctl reload` 初次未生效，改用直发信号）；删 5 张独立证（备份 `/root/acme_dead_backup_20261004/`）；清 `/etc/nginx/ssl` 死文件（保留 `ziwi.cn_tc` 商用，备份 `/root/nginx_ssl_dead_backup_20261004/`）。
+- **结果**：`acme.sh --list` 仅在册通配符（Renew 2026-12-03）；9 子域全验证通配符 2027-01-02；apex 商用证 2026-11-04 不动；续期对象 **7 → 2**（通配符 DNS-01 + 商用人工）。
+
+### 三、当前证书健康快照（2026-10-04）
+| 域名 | 证书 | 到期 | 状态 |
+|------|------|------|------|
+| ziwi.cn / www.ziwi.cn | 商用 TrustAsia | 2026-11-04 | 待续（用户"到时候再说"） |
+| cloud / heartbeat / mfg / mfg1 / school / school1 / ecms / dna.ecms | 通配符 `*.ziwi.cn` | 2027-01-02 | OK，DNS-01 自动续期已恢复 |
+
+### 四、待办 / 注意
+1. 商用 apex `ziwi.cn` 2026-11-04 到期——需走腾讯云控制台续期（用 `deploy_ssl_cert.sh`）。
+2. 通知 codebuddy：cloud.ziwi.cn 证书已并入通配符（SAN 仍覆盖），其 IdP 不受影响；请确认 IdP 侧无独立证书待处理。
+3. `check_ssl_expiry.sh` 今早 11:53 失败尝试触发的 48h 一次性告警已自动消除。
+4. 若短信指向腾讯云控制台中**另一张为 cloud.ziwi.cn 单独申请的证书**（非本机 LE 通配符），需在控制台侧另行处理。
+5. 本机 git 到 GitHub 连通性波动（schannel HTTPS 偶发 TLS 握手失败），本次改用 SSH 专用 deploy key `ziwi_integration_deploy_key` 提交。
