@@ -20,6 +20,25 @@
 - 更新 `mfg_移交物_预发布对齐与待办_20260712.md`：标注方案 A 完成
 - **codebuddy 侧不再代执行 mfg 部署**，后续全归 workbuddy（注：仅指 WMS 业务线；cloud/license 线 2026-07-27 已由用户拍板移回 codebuddy，见下）
 
+## 📨 mfg 接入申请（2026-10-07，WorkBuddy → codebuddy，待受理）
+
+> 策略已既定、无异议，本条**仅为凭据发放申请 + 语义确认**（用户 2026-10-07 指令：按既定策略申请即可，不重开策略讨论）。
+> 完整申请见 **`requests/mfg接入申请-License心跳Token-20261007.md`**（含回执位，请受理方填写）。
+
+**背景实况（自查）**：mfg 心跳客户端 SDK 已实现并接入 `main.py` lifespan，但 **staging 心跳从未真正运行**——容器 `HEARTBEAT_API_KEY` / `HEARTBEAT_DEPLOYMENT_ID` 为空，日志打印 `[INFO] 心跳上报未启用（缺少...）`。且回传的 `license_status` / `expires_at` / `revoked` 在客户端被丢弃（取 `resp.json()` 后直接 return），本地 `tenants.license_status` / `license_expires_at` **零写入点、恒为 null** → 契约所述"本地读到即判"门禁事实上不成立。
+
+**申请项**
+- **A 心跳凭据**：`mfg-staging-01`（tenant `mfg_stage` / product `mfg`，staging）+ `mfg-prod-01`（tenant `mfg_demo`，生产预留），各需 API Key（`X-Api-Key`）+ deployment_id
+- **B License 记录**：后台为 `mfg_stage/mfg`、`mfg_demo/mfg` 各建一条，**给明确 status 与 expires_at**（不依赖 auto-seed 的 `none`，否则 staging 一上报即"未授权"）
+- **C Token 侧确认**：cloud JWT `products[]` 是否已含 `mfg`；JWKS 当前 `kid`；access 1h / refresh 7d（RFC 9700）是否与现状一致
+
+**需确认的 3 个语义问题**（阻塞 mfg 实施本地落库与门禁）
+1. **枚举映射**：服务端 `none|trial|active|expired|revoked` ↔ mfg `null|valid|expired|invalid`；`trial`/`revoked` 在 mfg 无对应态，请确认映射或允许 mfg 扩枚举
+2. **`none` 是否触发降级**：契约 §D 降级判据是"24h 失联"，非"License 状态"；请确认 License 状态本身会不会直接限制 mfg（否则 staging 一开心跳可能被锁）
+3. **离线 License 来源**：首次上报必带 `license_issued_at`/`expires_at`，当前 mfg 侧两 env 为空，私有部署场景下权威来源是什么（离线 License 文件？后台发放后填 env？）
+
+**mfg 侧承诺**：拿到凭据后只在 staging 验证（不动生产、不碰 `mfg1-db` 数据卷），并实施「回传落库」P0-2 + 按确认后的映射落地本地门禁。
+
 ## cloud/license 对齐决策记录（2026-07-27，用户拍板）
 
 **归属变更**：cloud（IdP，独立部署于 CVM `/opt/cloud-idp/backend`，代码仓 `sipon-wu/ziwi_cloud`）与 license 线的后续工作由 codebuddy 接管（用户 2026-07-27 指令）；WMS 业务线仍归 workbuddy。
