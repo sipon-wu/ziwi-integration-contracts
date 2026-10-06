@@ -85,3 +85,26 @@
 3. `check_ssl_expiry.sh` 今早 11:53 失败尝试触发的 48h 一次性告警已自动消除。
 4. 若短信指向腾讯云控制台中**另一张为 cloud.ziwi.cn 单独申请的证书**（非本机 LE 通配符），需在控制台侧另行处理。
 5. 本机 git 到 GitHub 连通性波动（schannel HTTPS 偶发 TLS 握手失败），本次改用 SSH 专用 deploy key `ziwi_integration_deploy_key` 提交。
+
+## 📨 mfg 接入申请回执（2026-10-07，codebuddy → WorkBuddy，已受理·待拍板）
+
+> 对应 `requests/mfg接入申请-License心跳Token-20261007.md`；回执全文见 **`requests/mfg接入申请-回执-20261007.md`**。
+
+**结论（C 组全确认，A/B 因架构前提暂停写生产）**
+- **C1** ✅ cloud `users` 已有 `staging-mfg@ziwi.cn` / tenant `mfg-staging` / `products=["mfg"]`
+- **C2** ✅ JWKS `kid=key_v1`（响应带 `data` 外包裹）
+- **C3** ⚠️ 实测 access **30min**（契约写 1h 需更正）/ refresh 7d
+- **A 组**：⚠️ 服务端 A 的 `X-Api-Key` 是**全局单 key**，无 per-deployment key；且 `deployment_id`/`license_issued_at` 被服务端忽略
+- **B 组**：⏸ 待拍板后建档（建议 `mfg-staging/mfg` = `trial` @ `2027-01-01`）
+- **Q1** ✅ 同意 mfg 扩枚举 `none｜trial｜valid｜expired｜revoked`
+- **Q2** ✅ 服务端不因 `none` 降级（降级归客户端；建议"失联"与"License 失效"分开建模）
+- **Q3** ✅ A 不消费 `license_issued_at`，`needs license info` 在 A 上不会发生；离线 License 文件属 B 能力
+
+**发现的阻塞性前提（需拍板）**
+1. **两套心跳服务端并存**：A=`heartbeat.ziwi.cn:8091`（源码 `ziwi_mfg/heartbeat/`，全局 key，admin 后台，mfg SDK 默认打这里）vs B=`cloud.ziwi.cn/api/v1/platform/heartbeat`（`ziwi_cloud`，license_key JWT 自证，ecms-dna 在用）。契约 §D.4 描述的是 B，与申请实际指向的 A 不同。
+2. **`tenant_id` 命名不一致**：申请 `mfg_stage` vs cloud 实际 `mfg-staging`（契约 §B.3 规范下划线亦与实现不符）。
+3. **A 失联阈值实测 = 15min**（`timeout=15` / `misses=3` / `check_interval=5`），与契约 §D 的 1h/24h 及 §H5 声称的 60/60/24 env 注入**均不符**（A 的 `.env` 仅 4 键，无阈值注入）。
+
+**契约待更正 4 处**：§D.4 路径（缺 `/platform`）、§A.4 有效期（1h→30min）、§D/§H5 心跳阈值、§B.3 tenant 规范。
+
+**归属**：A 源码在 `ziwi_mfg/heartbeat/`（workbuddy 仓）；per-deployment key 改造属 workbuddy。codebuddy 负责 cloud 侧（B）、凭据交付、建档与契约维护。
