@@ -119,7 +119,7 @@
 | `sipon-wu/ziwi_school`（知微教学） | school 产品代码 + 产品规划文档（含《账户系统与cloud.ziwi.cn对接方案》v0.7 §13） | `AI教案/` | `54fc133` |
 | `sipon-wu/ziwi-integration-contracts`（协同） | **跨产品线契约真相源** `contracts/` + 申请/回执 `requests/` + STATUS | `ziwi-integration-contracts/` | `b2fd2cd` |
 | `sipon-wu/ziwi_cloud` | **cloud 后端源码权威**（08-11 自 CVM 快照建仓 + 08-24 ICP 备案） | `ziwi_cloud/` | `9b6887c` |
-| `sipon-wu/ziwi_mfg` | mfg 业务代码 + **A 心跳服务端源码**（`heartbeat/`） | `ziwi_mfg/` | `454c3f5` |
+| `sipon-wu/ziwi_mfg` | mfg 业务代码（**A 心跳服务端源码待迁出** → 运营端定位归 `ziwi_cloud`） | `ziwi_mfg/` | `454c3f5` |
 
 **归档裁定（用户 2026-10-07）**：`ziwi_mfg/cloud/` 是 workbuddy→codebuddy 移交前的**旧记录**，停更于 2026-07-29；cloud 后端源码一律以 `ziwi_cloud` 为准。两份 `platform.py` md5 已分叉（`be5ac0…` vs `80c3da…`），**旧记录只供追溯，禁止再改**。
 
@@ -132,5 +132,19 @@
 
 **待办（迁完才可归档/删除 `ziwi_mfg/cloud/`）**
 1. 把 `docker-compose.yml` / `deploy/` / `frontend/` / `qa/` / `产品规划/` 迁入 `ziwi_cloud`，CVM rsync 源改为 `ziwi_cloud`
-2. A 心跳服务端是否迁独立仓 `ziwi_heartbeat`（待用户授权新建远端仓）
+2. **A 心跳服务端源码迁入 `ziwi_cloud`**（2026-10-07 用户定位：`ziwi_cloud` = 运营端，私有部署心跳属运营端能力，不再考虑独立仓 `ziwi_heartbeat`）；迁完后 `/opt/heartbeat` 的 rsync 源随之改为 `ziwi_cloud`
 3. `/opt/heartbeat`、`/opt/cloud-idp` 接 git 版本保护
+
+### 运营端定位与租户模型（2026-10-07 用户裁定）
+
+`ziwi_cloud` 定位为**运营端**，三条产品线各自面向客户：
+
+| 项目 | 产品标识 | 客户实体（租户） | cloud 侧现状 |
+|---|---|---|---|
+| 项目 1 school | `school` | 学校（多校区 A1 合在同租户内） | `school-staging`、`dazhou_tc_yixiao` |
+| 项目 2 mfg | `mfg` | 制造工厂 | `mfg-staging`（`staging-mfg@ziwi.cn`） |
+| 项目 3 ecms | `ecms` | 制造工厂（**可与 mfg 合并为同一「制造工厂系」租户**） | `ecms-dna`（私有化实例） |
+
+**租户 = 客户实体（学校/工厂），产品 = 租户订阅的产品线，二者正交**：一个工厂租户可同时持 `products=["mfg","ecms"]`。契约 §I.1（`GET /tenants/{id}/licenses?product=`）与 A 服务端 `licenses` 表 `UNIQUE(tenant_id, product)` 约束即为此设计（`e557794` 曾专门修复"同租户并行 mfg+school"）。
+
+**由此确定的心跳租户规则（纠正此前误判）**：私有部署心跳上报的 `tenant_id` 用 **cloud 身份租户**，运营端才能按客户聚合名下各产品的实例与授权；产品线本地 ID 只在本地映射层使用（school 靠 `schools.cloud_tenant_id` 列，mfg 需新增 `tenants.cloud_tenant_id`）。此前本文件与回执中"心跳用产品线本地租户 ID"的表述**作废**，以 school 客户端既有实现（`internal/heartbeat/client.go:94-96`）为准。
