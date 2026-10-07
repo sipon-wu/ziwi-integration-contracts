@@ -216,7 +216,7 @@
 | ticket_no | tenant_id | 产品 | 状态 | 到期 | key | 实际使用情况 |
 |---|---|---|---|---|---|---|
 | `LIC-202607-OPVE` | `school-staging` | school | approved | 2026-12-31 | 无 | 走 CloudLogin JWT 身份链路，不需 key |
-| `LIC-202607-6VHI` | `dazhou_tc_yixiao`（达州通川一小） | school | approved | 2027-12-31 | 无 | 同上；`schools.cloud_tenant_id` 已绑定 |
+| `LIC-202607-6VHI` | `dazhou_tc_yixiao`（达州通川一小，**测试租户**） | school | approved | 2027-12-31 | 无 | 同上；`schools.cloud_tenant_id` 已绑定 |
 | `LIC-202607-GZ8M` | `mfg-staging`（知微智能·预发布） | mfg | approved / **active** | **2026-12-31** | **已签发 2026-07-30** | ❌ **从未使用**：心跳 env 全空、`instance_heartbeats` 无 mfg、心跳 A 无 mfg licenses 记录 |
 | `LIC-202608-O840` | `ecms-dna`（德耐尔） | ecms | approved / active | 2028-08-11 | 已签发 | ✅ **唯一跑通**：2026-08-11 上报 cloud 心跳（现已超 600s 在线窗口显示 offline） |
 
@@ -236,16 +236,18 @@
 |---|---|---|---|---|---|---|
 | school 预发布 | `school1.ziwi.cn` | `school-staging` | school | `LIC-202607-OPVE` approved/active 到期 2026-12-31 | 无 | 走 CloudLogin JWT 身份链路 |
 | mfg 预发布 | `mfg1.ziwi.cn` | `mfg-staging` | mfg | `LIC-202607-GZ8M` approved/active 到期 2026-12-31 | 已签发 07-30 | ❌ 空转（心跳 env 全空，从未上报） |
-| **school 生产** | `school.ziwi.cn` | `dazhou_tc_yixiao`（达州市通川区第一小学，**真实客户**） | school | `LIC-202607-6VHI` approved 到期 2027-12-31 | 无 | 已绑 `schools.cloud_tenant_id`，CloudLogin 已联通 |
+| school 生产 | `school.ziwi.cn` | `dazhou_tc_yixiao`（达州市通川区第一小学，**测试租户**，用户 2026-10-07 更正：非真实客户） | school | `LIC-202607-6VHI` approved 到期 2027-12-31 | 无 | 已绑 `schools.cloud_tenant_id`，CloudLogin 已联通 |
 | school 生产（演示租户） | 同上 | `sch-0001`（树人实验小学，**演示**，未绑 cloud） | school | 无工单，但 `schools.license_status=active` | 无 | 演示环境，**建议改名而非清理**（挂 105 份课件 + 验收账号） |
-| **ecms 生产** | `dna.ecms.ziwi.cn` | `ecms-dna`（德耐尔能源装备，**真实客户在用**） | ecms | `LIC-202608-O840` active **到期 2028-08-11** | 已签发 | ✅ 唯一跑通 license+心跳（走 **cloud B 服务**，2026-08-11 上报） |
+| **ecms 生产** | `dna.ecms.ziwi.cn` | `ecms-dna`（德耐尔能源装备） | ecms | `LIC-202608-O840` active **到期 2028-08-11** | 已签发 | ✅ **全平台唯一真实租户**：唯一跑通 license+心跳（走 **cloud B 服务**，2026-08-11 上报） |
 | ecms demo | `ecms.ziwi.cn` | **未建**（用户：既算 DEMO 又算生产，宜给独立租户 License 以保持策略一致；与 mfg 是否同租户待后续讨论） | ecms | 无 | — | 待开立 |
 | mfg 生产 | `mfg.ziwi.cn` | **未建**（未部署） | mfg | 无 | — | 待开立 |
 
 ### 🔒 P0 保护规则（生产在用，最高优先级）
 
-1. **绝不主动改动**：`dna.ecms.ziwi.cn`（真实客户，走 cloud B 心跳链路）、`dazhou_tc_yixiao`（真实学校，CloudLogin 已联通）这两条链路的协议、鉴权、密钥与数据。
-2. **心跳归一方向修正（2026-10-07，重要）**：此前一度建议"保留 A（heartbeat.ziwi.cn:8091）为唯一后端、B 降级为看板"——**方向错误**，因为真实客户 `dna.ecms` 走的是 **B**（`cloud.ziwi.cn/api/v1/platform/heartbeat`）。**正确方向：以 B 为权威，A 改造为兼容 B 或逐步下线；任何情况下不动 B 的协议与 license_key 校验。**
+1. **P0 只有一个真实租户**：`ecms-dna` / `dna.ecms.ziwi.cn`（德耐尔，**目前唯一真实客户**，走 cloud B 心跳链路 + license_key 自证）。其协议、鉴权、密钥、数据**绝不主动改动**。
+   - ⚠️ 更正记录：此前误把 `dazhou_tc_yixiao`（达州通川一小）列为真实客户，用户 2026-10-07 更正为**测试租户**；它降级为 P1（生产域名上的测试租户，中断会影响验收但无商业风险）。
+   - 保护级别分层：**P0** ecms-dna（真实）→ **P1** dazhou_tc_yixiao / sch-0001 / ecms demo（生产域名上的测试与演示）→ **P2** school-staging / mfg-staging（预发布，验证场）。
+2. **心跳归一方向修正（2026-10-07，重要）**：此前一度建议"保留 A（heartbeat.ziwi.cn:8091）为唯一后端、B 降级为看板"——**方向错误**，因为唯一真实租户 `dna.ecms` 走的是 **B**（`cloud.ziwi.cn/api/v1/platform/heartbeat`）。**正确方向：以 B 为权威，A 改造为兼容 B 或逐步下线；任何情况下不动 B 的协议与 license_key 校验。**
 3. 任何涉及心跳/鉴权/数据库的改造，执行前必须：① dry-run 差异清单 ② tar 快照 ③ 确认 P0 两条链路不受影响 ④ 主理人明确指令。
 
 ### 🎯 验证策略（用户口径：预发布环境用 License 管起来做方案测试）
