@@ -267,3 +267,23 @@
 
 **heartbeat 门禁账本现状**：`mfg-staging/mfg`(active, 2026-12-31)、`sch-0001/school`(active)、`test-school-uuid/school`(none 测试残留)。
 **仍未接入**：mfg1 容器 `HEARTBEAT_API_KEY`/`TENANT_ID`/`DEPLOYMENT_ID` 仍为空 → 心跳未跑（需 mfg 小组或主理人配 env，属重启容器操作）。
+
+## ✅ Q2 裁定落地：未授权宽限期（2026-10-07 已部署上线）
+
+**裁定**：未授权（`none`）视为需限制，但**宽限 30 天**——期间功能全开 + 小窗浮层提醒，超期才启用写限制（保留读/导出）；`expired`/`revoked` 无宽限立即限制。**是否限制完全由客户端判断，服务端只如实下发状态**。
+
+**服务端实现**（`ziwi_cloud` `c94803c`，已部署至 `/opt/heartbeat`）：
+- 心跳响应新增 `license_since`（授权记录起始时间）与 `grace_until`（仅 `none` 态 = since + N 天）
+- 新增 `HEARTBEAT_LICENSE_GRACE_DAYS`（默认 30，设 0 = 立即限制）
+- 测试：`backend/tests/test_heartbeat.py` 新增 2 条用例；本机因 PyPI 不通 + 缺 Rust 工具链**未能跑完整 pytest**，改以纯逻辑自测通过（`none`→+30d / 非 none→null）
+
+**生产实测**（2026-10-07，容器内实跑两次真实心跳）：
+
+| 租户 | license_status | license_since | grace_until |
+|---|---|---|---|
+| `mfg-staging`/`mfg` | `active` | 2026-10-07T01:45:24Z | `null` ✅ |
+| `test-school-uuid`/`school` | `none` | 2026-07-27T06:55:01Z | **2026-08-26T06:55:01Z**（=+30d，且已过期）✅ |
+
+**接入方实现要点（属各产品线代码，非 cloud）**：mfg 侧由 mfg 团队、school 侧由 school 小组落客户端判断与浮层。说明文档：`contracts/心跳响应字段与未授权宽限期说明-20261007.md`（含伪代码、文案建议、自测 curl）。
+
+**遗留**：B 服务（`cloud.ziwi.cn/api/v1/platform/heartbeat`，**唯一真实租户 `ecms-dna` 走这条**）尚未加同字段，待心跳归一（B 为权威）时同步——**不得先动 B**。
