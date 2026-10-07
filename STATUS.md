@@ -144,6 +144,22 @@
 - 🟡 **P3 待授权**：线上 compose `environment` 段硬编码 `PLATFORM_ADMIN_EMAIL=admin@ziwi.cn`，**覆盖了** `/opt/cloud-secrets/.env` 的 `fengliang@ziwi.cn`（`environment` 优先级高于 `env_file`）→ env 与 DB 不一致，建议删该行让其走 env_file
 - ⏳ `/opt/cloud-idp/backend/.git` 仍是 08-12 的无 remote 单机快照（1 commit，无未提交改动），属隐藏分叉点，未动
 
+### ✅ cloud 代码副本整合完成（2026-10-07，用户裁定"按 codebuddy 提交的为准"）
+
+**权威源唯一**：`sipon-wu/ziwi_cloud`（`backend/` 布局，与线上 `compose build: ./backend` 一致）
+
+| 副本 | 位置 | 处置 |
+|---|---|---|
+| 运营端代码（权威） | `ziwi_cloud` 仓 + `/opt/cloud-idp` | ✅ 保留 |
+| `ziwi_mfg/cloud/` | 本地 mfg 仓 | ✅ 已加 `.ARCHIVED.md` 标记（只读勿部署）；如需彻底删除工作区副本需另行明示 |
+| CVM `backend/.git`（08-12 无 remote 快照 `c08c7ab`） | 生产 | ✅ **已备份后删除** → `/opt/deploy_snapshots/cloud-idp_stale_2026-10-07_091608.tar.gz`（含 `.git`+`keys`，62KB）+ 同名 `.log` 留证 |
+| CVM `backend/keys/`（冗余明文私钥，未挂载未使用） | 生产 | ✅ 同上备份后删除；生效私钥在 docker 卷 `cloud-idp_cloud_keys` |
+| CVM 上 5 个前端文件 + 3 个组件 | 生产 | ✅ 已回收入库（`840e893`），内容与线上一致 |
+| CVM `frontend/dist` / `.pytest_cache` / `backend/CONTRIBUTING.md` | 生产 | 陈旧产物，下次 rsync `--delete` 自动清理（`cloud-frontend` 无宿主挂载，不影响运行） |
+| 本地 `ziwi_cloud/test_keys/key_v1_private.pem` | 本地 | gitignored 残留（与生产密钥不同），保留供本地测试 |
+
+> 整合后 cloud 生产目录**再无 git 分叉源**，四处副本收敛为一处；`/health` 复核 200。
+
 ### 运营端定位与租户模型（2026-10-07 用户裁定）
 
 `ziwi_cloud` 定位为**运营端**，三条产品线各自面向客户：
@@ -157,3 +173,38 @@
 **租户 = 客户实体（学校/工厂），产品 = 租户订阅的产品线，二者正交**：一个工厂租户可同时持 `products=["mfg","ecms"]`。契约 §I.1（`GET /tenants/{id}/licenses?product=`）与 A 服务端 `licenses` 表 `UNIQUE(tenant_id, product)` 约束即为此设计（`e557794` 曾专门修复"同租户并行 mfg+school"）。
 
 **由此确定的心跳租户规则（纠正此前误判）**：私有部署心跳上报的 `tenant_id` 用 **cloud 身份租户**，运营端才能按客户聚合名下各产品的实例与授权；产品线本地 ID 只在本地映射层使用（school 靠 `schools.cloud_tenant_id` 列，mfg 需新增 `tenants.cloud_tenant_id`）。此前本文件与回执中"心跳用产品线本地租户 ID"的表述**作废**，以 school 客户端既有实现（`internal/heartbeat/client.go:94-96`）为准。
+
+## 🟢 立项：cloud 运营端「school 产品线 1-0 公共数据托管」（2026-10-07 用户拍板开工）
+
+> 方案原件：`AI教案/cloud运营与运维/平台公共数据治理方案.md` v0.3（2026-08-09，此前"待立项"）。用户 2026-10-07 拍板：**按 MVP 范围立项、由 codebuddy 负责、验收依该方案 §10 DoD**。
+
+### MVP 范围（cloud 侧，codebuddy 交付）
+
+| 阶段 | 内容 | 归属 |
+|---|---|---|
+| **M0** | cloud 里建 school 产品线节点 + 8 张 `cloud_school_*` 源表（`source_version`/`data_kind`/`checksum`）+ 抽现有 seed 为 v1 | codebuddy |
+| **M1** | `GET /api/cloud/school/public-data/pull`（`data_kind`/`version`/`slice`/`since`；越权 403；`X-Storage-Mode` 头）+ 三类鉴权（2B license / 2C session / 私有化 license 离线验签）+ LicenseTicket 增授权范围字段 | codebuddy |
+| **M2+** | school 端快照拉取与 `A_SOURCE_MODE` 双读迁移 | **school 小组** |
+| M3/M4 | 运营 UI、私有化 license 拉快照 | M3 归 cloud（可后置），M4 视私有化进度 |
+
+**MVP 不含**：完整运营 UI（改为脚本/接口发布版本）、school 端改造、私有化改造、灰度 allowlist UI（用表 + 接口）。
+
+### DoD（§10）验收归属映射
+
+| DoD 条目 | MVP 可验 | 责任侧 |
+|---|---|---|
+| 同源（source_version 可追溯、无手工 seed 残留） | ✅ cloud 侧可验 | codebuddy |
+| 可下发（pull 三鉴权 / 越权 403） | ✅ cloud 侧可验 | codebuddy |
+| 无原文泄漏（SaaS `distilled_only`、cloud 源表无原文列） | ✅ cloud 侧可验 | codebuddy |
+| 可回退（发布不可变 + allowlist 指回旧版） | ✅ cloud 侧可验 | codebuddy |
+| 假绿根治（源库行数/checksum 断言 + cron 守门） | ✅ cloud 侧可建断言 | codebuddy |
+| 可运维（运营 UI 录入/发布/灰度/回滚/审计） | ❌ **MVP 除外**（降级为脚本 + 发布/审计表） | M3 |
+| 可追溯（pull/release 审计记录） | ✅ cloud 侧可验 | codebuddy |
+
+### ⚠️ 动工前必须先校准的 3 处（否则会写错授权范围）
+
+1. **租户口径**：方案按"租户=产品线"分轴（`1-1` school / `2-1` mfg），而 2026-10-07 已定 **租户=客户实体（学校/工厂）、产品正交**（mfg 与 ecms 可合并为同一"制造工厂系"租户）→ LicenseTicket 授权字段须按客户实体建模，`slice` 白名单挂在"租户×产品线"上。
+2. **`0-1` heartbeat 尚未归一**：方案 §9.3 记 heartbeat "已有（独立后端）"，实为 A/B 两套并存（见 §D.4 与 school 方案 §13.1）→ 须先收敛为单一后端，`0-1` 才算达标。
+3. **Token 供方（`0-2`）现状**：方案记"部分（百炼直连）"，MVP 不涉及，但立项文档需标注其与 `1-2` 租户 Token 计量的依赖关系，避免后续把计费口径写死在产品线。
+
+> 状态：**已立项，动工前先做上述校准**；校准结论回写方案 v0.4（原件在 school 仓，需 school 小组同步）。
