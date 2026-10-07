@@ -287,3 +287,22 @@
 **接入方实现要点（属各产品线代码，非 cloud）**：mfg 侧由 mfg 团队、school 侧由 school 小组落客户端判断与浮层。说明文档：`contracts/心跳响应字段与未授权宽限期说明-20261007.md`（含伪代码、文案建议、自测 curl）。
 
 **遗留**：B 服务（`cloud.ziwi.cn/api/v1/platform/heartbeat`，**唯一真实租户 `ecms-dna` 走这条**）尚未加同字段，待心跳归一（B 为权威）时同步——**不得先动 B**。
+
+## 📣 给接入方的同步说明（2026-10-07，文档已分发）
+
+**正本**：`contracts/心跳响应字段与未授权宽限期说明-20261007.md`（跨产品线契约唯一真相源）
+**分发副本**：
+- `ziwi_cloud` 仓：`heartbeat/`（服务端同仓，已含实现与测试）
+- school 仓：`产品规划/【转抄自协同仓】心跳响应字段与未授权宽限期说明-20261007.md`（顶部已标注正本，防双源分叉）
+- mfg 侧：见下方「可直接转发给 WorkBuddy 的消息」
+
+### 可直接转发给 WorkBuddy（mfg 团队）的消息
+
+> **主题**：mfg 接入申请回执已收敛 · 心跳服务端已上线两项能力
+>
+> 1. **Q2 已由主理人拍板**：`none`（未授权）**视为需限制，但宽限 30 天**——期间功能全开、仅做**小窗浮层提醒**；超期才启用写限制（禁新建/修改，保留查询与导出）。`expired`/`revoked` 无宽限。
+> 2. **服务端已上线并实测**：心跳响应新增两个字段 `license_since`（授权起始时间）与 `grace_until`（仅 `none` 态 = 起始 + 30 天）。宽限天数可用 `HEARTBEAT_LICENSE_GRACE_DAYS` 调整。
+> 3. **请 mfg 侧实现客户端判断**（属 mfg 代码）：判 `license_status` + `grace_until` → 决定"浮层提醒"还是"锁写"。**伪代码与浮层文案建议见正本文档**，照抄即可。
+> 4. **License 已就绪**：cloud 工单 `LIC-202607-GZ8M`（`mfg-staging`/`mfg`、active、到期 2026-12-31、key 已签发），心跳门禁账本镜像记录**已建**。mfg1 侧只差配 `HEARTBEAT_API_KEY` / `HEARTBEAT_TENANT_ID` / `HEARTBEAT_DEPLOYMENT_ID`（`TENANT_ID` 用 **`mfg-staging`**）并重启容器。
+> 5. **两点提醒**：① 心跳服务端**只有一把全局 key**，无法按部署发放，请勿外传；② 心跳服务端 A（`heartbeat.ziwi.cn`）与 cloud 侧 B（`cloud.ziwi.cn/api/v1/platform/heartbeat`）**归一方向为「以 B 为权威、A 兼容或下线」**（因唯一真实租户 `ecms-dna` 在 B 上），**A 侧客户端暂按现状对接即可，不要自行改协议**。
+> 6. 完整回执见 `requests/mfg接入申请-回执-20261007.md`（顶部有逐项状态摘要表）。
