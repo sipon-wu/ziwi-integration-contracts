@@ -255,3 +255,15 @@
 - `school1`（school-staging）+ `mfg1`（mfg-staging）= **方案验证试验田**：License 发放 → 心跳 → 下发 → 灰度 → 回滚 全链路先在此跑通。
 - **生产租户只做"不受影响的旁观者"**：达州通川一小、德耐尔两条真实链路保持不动；涉及生产租户的操作需单独授权。
 - 预发布验证通过后，再为 `mfg.ziwi.cn` 建生产租户并发放 License。
+
+## ✅ License 发放操作（2026-10-07，主理人批准后执行）
+
+| # | 事项 | 结果 |
+|---|---|---|
+| 1 | 心跳门禁账本（A 服务 `licenses` 表）补 `mfg-staging`/`mfg` | ✅ 已建：`active`，到期 **2026-12-31**，`issued_at=2026-07-29`，notes 注明镜像自工单 `LIC-202607-GZ8M`；建前已备份 `heartbeat.db.bak_2026-10-07_094354`（volume `heartbeat_heartbeat_data`）。理由：cloud 工单已批但门禁账本无记录 → mfg 上报心跳会被判未授权 |
+| 2 | `ecms-demo` 独立租户（`ecms.ziwi.cn` 演示站） | ✅ 已建 `LIC-202610-DEMO`：tenant `ecms-demo` / "知微能碳·演示" / product `ecms` / tier `demo` / `deploy_mode=saas` / approved+active / 到期 **2027-10-07** / **不签发 license_key**（SaaS 走 JWT 身份）/ 未建 cloud 账号（密码不经手，由 ecms 团队自助注册） |
+| 3 | `ecms-dna.product` 规范化 | ⚠️ **经复核无需修改**：用 psql `-A` 无对齐模式复查确认 `product` 本就是 `ecms`、`ticket_type=new`、`status=approved` 均正常。此前"product 是中文"系 **psql 中文列宽导致的误读**——那句中文实际是 license_key JWT payload 内的 `tenant_name`。教训：**查 PG 中文数据一律用 `-A -F' | ' -t`**，勿按对齐竖线数列 |
+| 4 | `ecms-demo.current_expires_at` 归零 | ✅ 已改 NULL，与既有 4 条一致。依据：`renew_license()` 以 **`requested_expires_at`** 为续期基线（`platform_service.py:448-465`），`current_expires_at` 不参与续期判断 |
+
+**heartbeat 门禁账本现状**：`mfg-staging/mfg`(active, 2026-12-31)、`sch-0001/school`(active)、`test-school-uuid/school`(none 测试残留)。
+**仍未接入**：mfg1 容器 `HEARTBEAT_API_KEY`/`TENANT_ID`/`DEPLOYMENT_ID` 仍为空 → 心跳未跑（需 mfg 小组或主理人配 env，属重启容器操作）。
