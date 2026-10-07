@@ -111,3 +111,26 @@
 **阈值口径四分裂**：教学规划「1天/3天」→ A 实测「15min/3次」→ 契约 v0.3「1h/24h」→ school 客户端「24h」。**副作用：school 若启用心跳，15min 超时会将其长期判 offline**，需统一（建议服务端改 1h/24h，客户端不动）。
 
 **归属（2026-10-07 用户拍板更正）**：**cloud / heartbeat / mfg 三线代码与部署全部归 codebuddy**（CVM SSH key 仅 Mac 持有，物理上亦只能 codebuddy 执行）。A 的源码虽寄生在 `ziwi_mfg` 仓 `heartbeat/`，其 per-deployment key 改造等维护**同属 codebuddy**；school 仓《账户系统与cloud.ziwi.cn对接方案.md》§12.4 的旧分工（workbuddy 开发部署 / codebuddy 只出备忘）已于同日更正为 v0.7。WorkBuddy 侧剩余工作仅为 mfg 业务侧实施 P0-2（回传落库，可参照 school 既有实现）。
+
+## 📦 仓库权威边界与归档裁定（2026-10-07，用户裁定 + 实测）
+
+| 仓 | 承载内容（权威） | 本地 | HEAD |
+|---|---|---|---|
+| `sipon-wu/ziwi_school`（知微教学） | school 产品代码 + 产品规划文档（含《账户系统与cloud.ziwi.cn对接方案》v0.7 §13） | `AI教案/` | `54fc133` |
+| `sipon-wu/ziwi-integration-contracts`（协同） | **跨产品线契约真相源** `contracts/` + 申请/回执 `requests/` + STATUS | `ziwi-integration-contracts/` | `b2fd2cd` |
+| `sipon-wu/ziwi_cloud` | **cloud 后端源码权威**（08-11 自 CVM 快照建仓 + 08-24 ICP 备案） | `ziwi_cloud/` | `9b6887c` |
+| `sipon-wu/ziwi_mfg` | mfg 业务代码 + **A 心跳服务端源码**（`heartbeat/`） | `ziwi_mfg/` | `454c3f5` |
+
+**归档裁定（用户 2026-10-07）**：`ziwi_mfg/cloud/` 是 workbuddy→codebuddy 移交前的**旧记录**，停更于 2026-07-29；cloud 后端源码一律以 `ziwi_cloud` 为准。两份 `platform.py` md5 已分叉（`be5ac0…` vs `80c3da…`），**旧记录只供追溯，禁止再改**。
+
+**⚠️ 但 `ziwi_mfg/cloud/` 暂不可删**——它独占 cloud 的部署资产，而 `ziwi_cloud` 仓没有：
+- `docker-compose.yml`（含 7-29 密钥外置 `/opt/cloud-secrets/.env` 的安全加固）
+- `deploy/deploy.sh`、`deploy/nginx`、`deploy/runbook.md`
+- `frontend/`、`qa/`、`产品规划/`、`质量保障纪律.md`、`.env.example`
+
+**且 CVM 两个部署目录均无 git**：`/opt/cloud-idp`（生产源头 = `ziwi_mfg/cloud/`）与 `/opt/heartbeat`（源头 = `ziwi_mfg/heartbeat/`）都是 rsync 部署副本。**改 cloud 源码只改 `ziwi_cloud` 不会自动上线**，必须 rsync；反之改 mfg 仓那份会上线但造成权威分叉——这是当前最易踩的坑。
+
+**待办（迁完才可归档/删除 `ziwi_mfg/cloud/`）**
+1. 把 `docker-compose.yml` / `deploy/` / `frontend/` / `qa/` / `产品规划/` 迁入 `ziwi_cloud`，CVM rsync 源改为 `ziwi_cloud`
+2. A 心跳服务端是否迁独立仓 `ziwi_heartbeat`（待用户授权新建远端仓）
+3. `/opt/heartbeat`、`/opt/cloud-idp` 接 git 版本保护
