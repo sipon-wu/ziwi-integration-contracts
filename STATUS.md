@@ -118,8 +118,8 @@
 |---|---|---|---|
 | `sipon-wu/ziwi_school`（知微教学） | school 产品代码 + 产品规划文档（含《账户系统与cloud.ziwi.cn对接方案》v0.7 §13） | `AI教案/` | `54fc133` |
 | `sipon-wu/ziwi-integration-contracts`（协同） | **跨产品线契约真相源** `contracts/` + 申请/回执 `requests/` + STATUS | `ziwi-integration-contracts/` | `b2fd2cd` |
-| `sipon-wu/ziwi_cloud` | **cloud 后端源码权威**（08-11 自 CVM 快照建仓 + 08-24 ICP 备案） | `ziwi_cloud/` | `9b6887c` |
-| `sipon-wu/ziwi_mfg` | mfg 业务代码（**A 心跳服务端源码待迁出** → 运营端定位归 `ziwi_cloud`） | `ziwi_mfg/` | `454c3f5` |
+| `sipon-wu/ziwi_cloud` | **运营端**：cloud 后端源码权威 + 部署资产（`docker-compose.yml`/`deploy/`/`frontend/`/`qa/`/`产品规划/`）+ **A 心跳服务端**（`heartbeat/`，2026-10-07 迁入） | `ziwi_cloud/` | `e59e72f` |
+| `sipon-wu/ziwi_mfg` | mfg 业务代码（`cloud/`、`heartbeat/` **已归档为只读历史**，见各自 `.ARCHIVED.md`） | `ziwi_mfg/` | `bb3f36d` |
 
 **归档裁定（用户 2026-10-07）**：`ziwi_mfg/cloud/` 是 workbuddy→codebuddy 移交前的**旧记录**，停更于 2026-07-29；cloud 后端源码一律以 `ziwi_cloud` 为准。两份 `platform.py` md5 已分叉（`be5ac0…` vs `80c3da…`），**旧记录只供追溯，禁止再改**。
 
@@ -130,10 +130,13 @@
 
 **且 CVM 两个部署目录均无 git**：`/opt/cloud-idp`（生产源头 = `ziwi_mfg/cloud/`）与 `/opt/heartbeat`（源头 = `ziwi_mfg/heartbeat/`）都是 rsync 部署副本。**改 cloud 源码只改 `ziwi_cloud` 不会自动上线**，必须 rsync；反之改 mfg 仓那份会上线但造成权威分叉——这是当前最易踩的坑。
 
-**待办（迁完才可归档/删除 `ziwi_mfg/cloud/`）**
-1. 把 `docker-compose.yml` / `deploy/` / `frontend/` / `qa/` / `产品规划/` 迁入 `ziwi_cloud`，CVM rsync 源改为 `ziwi_cloud`
-2. **A 心跳服务端源码迁入 `ziwi_cloud`**（2026-10-07 用户定位：`ziwi_cloud` = 运营端，私有部署心跳属运营端能力，不再考虑独立仓 `ziwi_heartbeat`）；迁完后 `/opt/heartbeat` 的 rsync 源随之改为 `ziwi_cloud`
-3. `/opt/heartbeat`、`/opt/cloud-idp` 接 git 版本保护
+**归档裁定执行结果（2026-10-07 已完成）**
+- ✅ 部署资产已迁入 `ziwi_cloud`：`docker-compose.yml`、`.env.example`、`质量保障纪律.md`、`deploy/`、`frontend/`、`qa/`、`产品规划/`（commit `e59e72f`，78 文件，私钥已排除）
+- ✅ A 心跳服务端源码已迁入 `ziwi_cloud/heartbeat/`（backend + client SDK + deploy + 文档，未含 `data/`、`.env`）
+- ✅ `ziwi_mfg` 旧副本已加 `.ARCHIVED.md` 标记（commit `bb3f36d`），写明"只读、勿部署"与迁移动向；目录保留仅供追溯，**删除需用户另行授权**
+- ⏳ **CVM rsync 源尚未切换**：`/opt/cloud-idp` 仍以 `ziwi_mfg/cloud/` 为源、`/opt/heartbeat` 仍以 `ziwi_mfg/heartbeat/` 为源。下次部署必须改为 rsync 自 `ziwi_cloud`，否则改动不会生效；而误用旧源又会把已归档副本推上线——这是当前最易踩的坑
+- ⏳ `/opt/cloud-idp`、`/opt/heartbeat` 仍无 git（无版本保护）
+- 🔴 **安全待办**：`ziwi_mfg` 历史中含 `cloud/backend/test_keys/key_v1_private.pem`（私钥，迁入时已被 gitignore 排除但历史仍在），应视为已泄露 → 轮换密钥 + 视情况清史
 
 ### 运营端定位与租户模型（2026-10-07 用户裁定）
 
