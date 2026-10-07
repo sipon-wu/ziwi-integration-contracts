@@ -136,7 +136,13 @@
 - ✅ `ziwi_mfg` 旧副本已加 `.ARCHIVED.md` 标记（commit `bb3f36d`），写明"只读、勿部署"与迁移动向；目录保留仅供追溯，**删除需用户另行授权**
 - ⏳ **CVM rsync 源尚未切换**：`/opt/cloud-idp` 仍以 `ziwi_mfg/cloud/` 为源、`/opt/heartbeat` 仍以 `ziwi_mfg/heartbeat/` 为源。下次部署必须改为 rsync 自 `ziwi_cloud`，否则改动不会生效；而误用旧源又会把已归档副本推上线——这是当前最易踩的坑
 - ⏳ `/opt/cloud-idp`、`/opt/heartbeat` 仍无 git（无版本保护）
-- 🔴 **安全待办**：`ziwi_mfg` 历史中含 `cloud/backend/test_keys/key_v1_private.pem`（私钥，迁入时已被 gitignore 排除但历史仍在），应视为已泄露 → 轮换密钥 + 视情况清史
+- 🔴 **安全待办**：`ziwi_mfg` 历史中含 `cloud/backend/test_keys/key_v1_private.pem`。**已核实：生产私钥与仓库测试私钥指纹不同**（生产 `a394574a…` 在 docker 卷 `cloud-idp_cloud_keys`，部署时独立生成、从未进 git；仓库 `81335739…` 是另一把测试密钥）→ **生产未泄露，风险低**，无需轮换
+- ✅ **布局已在本地理顺**（2026-10-07，`ziwi_cloud` `840e893`）：`app/`/`tests/`/`test_keys/`/`Dockerfile`/`requirements.txt` 全部移入 `backend/`，与线上 `compose build: ./backend` 一致 → rsync 变为**纯覆盖**，无需改服务器任何配置
+- ✅ **回收服务器上未入库的运营端代码**（取证后入仓）：5 个前端文件（`cloud-auth.ts`/`auth.ts`/`AdminConsole.vue`/`Dashboard.vue`/`TenantView.vue`，含 License 工单流 `/platform/tickets`、审批、财务确认、续期、实例列表）+ 3 个组件（`tickets/`、`ops/OpsHealth.vue`）+ `reset_super_admin_password.py`。dry-run 复验：业务文件覆盖归零，仅剩缓存/构建产物/冗余待清理
+- ⚠️ **布局移动的连带坑（已修）**：`.gitignore` 中含斜杠规则（`test_keys/*_private.pem`）会锚定顶层，移动到 `backend/` 后失效 → 私钥一度被暂存。已改为层级无关规则（`**/*_private.pem`、`**/keys/`）并复核无私钥入库
+- 🟡 **P2 待授权**：`/opt/cloud-idp/backend/keys/` 是**未挂载、未使用的冗余私钥副本**（生效私钥在 docker 卷），下次部署会被 `--delete` 清理（无运行影响）
+- 🟡 **P3 待授权**：线上 compose `environment` 段硬编码 `PLATFORM_ADMIN_EMAIL=admin@ziwi.cn`，**覆盖了** `/opt/cloud-secrets/.env` 的 `fengliang@ziwi.cn`（`environment` 优先级高于 `env_file`）→ env 与 DB 不一致，建议删该行让其走 env_file
+- ⏳ `/opt/cloud-idp/backend/.git` 仍是 08-12 的无 remote 单机快照（1 commit，无未提交改动），属隐藏分叉点，未动
 
 ### 运营端定位与租户模型（2026-10-07 用户裁定）
 
