@@ -208,3 +208,24 @@
 3. **Token 供方（`0-2`）现状**：方案记"部分（百炼直连）"，MVP 不涉及，但立项文档需标注其与 `1-2` 租户 Token 计量的依赖关系，避免后续把计费口径写死在产品线。
 
 > 状态：**已立项，动工前先做上述校准**；校准结论回写方案 v0.4（原件在 school 仓，需 school 小组同步）。
+
+## 🔎 License 现状核实（2026-10-07 实测，License 发放职责范围内）
+
+**cloud `license_tickets` 全表仅 4 条**（`license_key` = 私有化/预发布实例自证身份用）：
+
+| ticket_no | tenant_id | 产品 | 状态 | 到期 | key | 实际使用情况 |
+|---|---|---|---|---|---|---|
+| `LIC-202607-OPVE` | `school-staging` | school | approved | 2026-12-31 | 无 | 走 CloudLogin JWT 身份链路，不需 key |
+| `LIC-202607-6VHI` | `dazhou_tc_yixiao`（达州通川一小） | school | approved | 2027-12-31 | 无 | 同上；`schools.cloud_tenant_id` 已绑定 |
+| `LIC-202607-GZ8M` | `mfg-staging`（知微智能·预发布） | mfg | approved / **active** | **2026-12-31** | **已签发 2026-07-30** | ❌ **从未使用**：心跳 env 全空、`instance_heartbeats` 无 mfg、心跳 A 无 mfg licenses 记录 |
+| `LIC-202608-O840` | `ecms-dna`（德耐尔） | ecms | approved / active | 2028-08-11 | 已签发 | ✅ **唯一跑通**：2026-08-11 上报 cloud 心跳（现已超 600s 在线窗口显示 offline） |
+
+**无 License 的域名**：`ecms.ziwi.cn`（能碳 SaaS 生产，cloud 无任何 ecms SaaS 租户工单）、`mfg.ziwi.cn`（未部署）。
+
+**school 侧 License 现状（重要）**：`schools.license_status` 仅两处消费——① 前端家长端 UI 锁定（`RequireSchoolLicense.tsx`，判 `localStorage` 值，**可绕过**）② 教材版本配置模式（登录时透传）。**后端无强制门禁、无到期判断**（`license_expires_at` 全为 NULL）。故当前 License 对 school **无约束力**。
+
+**两条已识别的数据源/口径问题**：
+1. **License 双数据源**：权威源 = cloud `license_tickets`；心跳 A 的 `licenses` 表为门禁镜像，**无同步机制** → 已出现 tenant 名三值并存（`mfg-staging` / `mfg_stage` / `mfg1-pre`）。
+2. **回执前提过期**：`requests/mfg接入申请-回执-20261007.md` 中"mfg 无 License、需新建 trial@2027-01-01"已作废，修订为"cloud 已有 active 工单，待建 A 侧镜像记录，到期对齐 2026-12-31"。
+
+**时效风险**：`mfg-staging` 工单 2026-12-31 到期；`school-staging` 同日到期。
