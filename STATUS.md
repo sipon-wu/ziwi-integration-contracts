@@ -102,9 +102,12 @@
 
 **发现的阻塞性前提（需拍板）**
 1. **两套心跳服务端并存**：A=`heartbeat.ziwi.cn:8091`（源码 `ziwi_mfg/heartbeat/`，全局 key，admin 后台，mfg SDK 默认打这里）vs B=`cloud.ziwi.cn/api/v1/platform/heartbeat`（`ziwi_cloud`，license_key JWT 自证，ecms-dna 在用）。契约 §D.4 描述的是 B，与申请实际指向的 A 不同。
-2. **`tenant_id` 命名不一致**：申请 `mfg_stage` vs cloud 实际 `mfg-staging`（契约 §B.3 规范下划线亦与实现不符）。
+2. **三套租户标识各自独立（已裁定）**：产品线自有租户（mfg `mfg_stage`/`mfg_demo`；school `sch-0001`/`sch-dazhou-tc-yixiao`）｜cloud 身份租户（mfg `mfg-staging`；school `dazhou_tc_yixiao`）｜心跳侧 tenant_id（A DB 自由字段）。**心跳侧取产品线本地租户标识**（否则回传 license 写不回本地表），cloud 侧只管身份，映射由接入方维护——school 已有 `schools.cloud_tenant_id` 列先例，mfg 建议照加 `tenants.cloud_tenant_id`。契约 §B.3「统一命名」预设需放宽。
 3. **A 失联阈值实测 = 15min**（`timeout=15` / `misses=3` / `check_interval=5`），与契约 §D 的 1h/24h 及 §H5 声称的 60/60/24 env 注入**均不符**（A 的 `.env` 仅 4 键，无阈值注入）。
 
-**契约待更正 4 处**：§D.4 路径（缺 `/platform`）、§A.4 有效期（1h→30min）、§D/§H5 心跳阈值、§B.3 tenant 规范。
+**契约待更正 5 处**：§D.4 路径（缺 `/platform`）、§A.4 有效期（1h→30min）、§D/§H5 心跳阈值、§B.3 tenant 规范（放宽为"仅约束 cloud 身份侧"）、**§D.4 归属（B 实为 WorkBuddy `813b11f` 2026-07-27 开发，非 codebuddy；codebuddy 仅建仓快照+ecms-dna 实测）**。
+
+**成因与口径**（git 证据见回执 §0.1.1）：heartbeat 概念与域名由**知微教学（school）侧** 2026-07-09 规划创立；WorkBuddy 于 07-10 落地 A（`3fb916b`，`ziwi_mfg/heartbeat/`）、07-27 在 cloud 内另建 B（`813b11f`）；07-27 cloud 归属移交仅带走 B → 双轨。
+**阈值口径四分裂**：教学规划「1天/3天」→ A 实测「15min/3次」→ 契约 v0.3「1h/24h」→ school 客户端「24h」。**副作用：school 若启用心跳，15min 超时会将其长期判 offline**，需统一（建议服务端改 1h/24h，客户端不动）。
 
 **归属**：A 源码在 `ziwi_mfg/heartbeat/`（workbuddy 仓）；per-deployment key 改造属 workbuddy。codebuddy 负责 cloud 侧（B）、凭据交付、建档与契约维护。
