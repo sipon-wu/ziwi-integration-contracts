@@ -110,4 +110,4 @@
 **成因与口径**（git 证据见回执 §0.1.1）：heartbeat 概念与域名由**知微教学（school）侧** 2026-07-09 规划创立；WorkBuddy 于 07-10 落地 A（`3fb916b`，`ziwi_mfg/heartbeat/`）、07-27 在 cloud 内另建 B（`813b11f`）；07-27 cloud 归属移交仅带走 B → 双轨。
 **阈值口径四分裂**：教学规划「1天/3天」→ A 实测「15min/3次」→ 契约 v0.3「1h/24h」→ school 客户端「24h」。**副作用：school 若启用心跳，15min 超时会将其长期判 offline**，需统一（建议服务端改 1h/24h，客户端不动）。
 
-**归属**：A 源码在 `ziwi_mfg/heartbeat/`（workbuddy 仓）；per-deployment key 改造属 workbuddy。codebuddy 负责 cloud 侧（B）、凭据交付、建档与契约维护。
+**归属（2026-10-07 用户拍板更正）**：**cloud / heartbeat / mfg 三线代码与部署全部归 codebuddy**（CVM SSH key 仅 Mac 持有，物理上亦只能 codebuddy 执行）。A 的源码虽寄生在 `ziwi_mfg` 仓 `heartbeat/`，其 per-deployment key 改造等维护**同属 codebuddy**；school 仓《账户系统与cloud.ziwi.cn对接方案.md》§12.4 的旧分工（workbuddy 开发部署 / codebuddy 只出备忘）已于同日更正为 v0.7。WorkBuddy 侧剩余工作仅为 mfg 业务侧实施 P0-2（回传落库，可参照 school 既有实现）。
