@@ -212,7 +212,7 @@
 
 ## 🔎 License 现状核实（2026-10-07 实测，License 发放职责范围内）
 
-**cloud `license_tickets` 全表仅 4 条**（`license_key` = 私有化/预发布实例自证身份用）：
+**cloud `license_tickets` 全表 6 条**（`license_key` = 私有化/预发布实例自证身份用；2026-10-19 新增 `ecms-demo` 与 `ecms-xgn`）：
 
 | ticket_no | tenant_id | 产品 | 状态 | 到期 | key | 实际使用情况 |
 |---|---|---|---|---|---|---|
@@ -220,6 +220,8 @@
 | `LIC-202607-6VHI` | `dazhou_tc_yixiao`（达州通川一小，**测试租户**） | school | approved | 2027-12-31 | 无 | 同上；`schools.cloud_tenant_id` 已绑定 |
 | `LIC-202607-GZ8M` | `mfg-staging`（知微智能·预发布） | mfg | approved / **active** | **2026-12-31** | **已签发 2026-07-30** | ❌ **从未使用**：心跳 env 全空、`instance_heartbeats` 无 mfg、心跳 A 无 mfg licenses 记录 |
 | `LIC-202608-O840` | `ecms-dna`（德耐尔） | ecms | approved / active | 2028-08-11 | 已签发 | ✅ **唯一跑通**：2026-08-11 上报 cloud 心跳（现已超 600s 在线窗口显示 offline） |
+| `LIC-202610-DEMO` | `ecms-demo`（知微能碳·演示） | ecms | approved / active | 2027-10-07 | 无 | `ecms.ziwi.cn` 演示站；tier `demo` / `deploy_mode=saas`，按策略不签发 key |
+| `LIC-202610-QMOT` | `ecms-xgn`（扬州新概念电气） | ecms | approved / active | **2027-10-19** | **已签发 2026-10-19（含 `domain`）** | 新上线客户，交付前状态（实例软模式）。⚠️ 续期必须人工重签，见回执 §四.4 |
 
 **无 License 的域名**：`ecms.ziwi.cn`（能碳 SaaS 生产，cloud 无任何 ecms SaaS 租户工单）、`mfg.ziwi.cn`（未部署）。
 
@@ -240,7 +242,8 @@
 | school 生产 | `school.ziwi.cn` | `dazhou_tc_yixiao`（达州市通川区第一小学，**测试租户**，用户 2026-10-07 更正：非真实客户） | school | `LIC-202607-6VHI` approved 到期 2027-12-31 | 无 | 已绑 `schools.cloud_tenant_id`，CloudLogin 已联通 |
 | school 生产（演示租户） | 同上 | `sch-0001`（树人实验小学，**演示**，未绑 cloud） | school | 无工单，但 `schools.license_status=active` | 无 | 演示环境，**建议改名而非清理**（挂 105 份课件 + 验收账号） |
 | **ecms 生产** | `dna.ecms.ziwi.cn` | `ecms-dna`（德耐尔能源装备） | ecms | `LIC-202608-O840` active **到期 2028-08-11** | 已签发 | ✅ **全平台唯一真实租户**：唯一跑通 license+心跳（走 **cloud B 服务**，2026-08-11 上报） |
-| ecms demo | `ecms.ziwi.cn` | **未建**（用户：既算 DEMO 又算生产，宜给独立租户 License 以保持策略一致；与 mfg 是否同租户待后续讨论） | ecms | 无 | — | 待开立 |
+| ecms demo | `ecms.ziwi.cn` | `ecms-demo`（知微能碳·演示；2026-10-07 建） | ecms | `LIC-202610-DEMO` approved/active 到期 2027-10-07 | 无（按策略不签） | 演示站；SaaS 走 JWT 身份链路 |
+| **ecms 生产（新租户）** | `yzxgn.ecms.ziwi.cn` | `ecms-xgn`（扬州新概念电气，**我方 CVM 托管 + 独立目录 + 独立库**，即 ECMS 口径的 `private`） | ecms | `LIC-202610-QMOT` approved/active 到期 **2027-10-19** | 已签发 2026-10-19（**含 `domain`**） | 交付前状态：软模式；`INSTANCE_DOMAIN` 配置后 domain 校验才生效 |
 | mfg 生产 | `mfg.ziwi.cn` | **未建**（未部署） | mfg | 无 | — | 待开立 |
 
 ### 🔒 P0 保护规则（生产在用，最高优先级）
@@ -248,6 +251,7 @@
 1. **P0 只有一个真实租户**：`ecms-dna` / `dna.ecms.ziwi.cn`（德耐尔，**目前唯一真实客户**，走 cloud B 心跳链路 + license_key 自证）。其协议、鉴权、密钥、数据**绝不主动改动**。
    - ⚠️ 更正记录：此前误把 `dazhou_tc_yixiao`（达州通川一小）列为真实客户，用户 2026-10-07 更正为**测试租户**；它降级为 P1（生产域名上的测试租户，中断会影响验收但无商业风险）。
    - 保护级别分层：**P0** ecms-dna（真实）→ **P1** dazhou_tc_yixiao / sch-0001 / ecms demo（生产域名上的测试与演示）→ **P2** school-staging / mfg-staging（预发布，验证场）。
+   - **2026-10-19 新增 `ecms-xgn`**（扬州新概念电气，`yzxgn.ecms.ziwi.cn`，托管于我方 CVM、独立目录+独立库）：新上线的线上客户，**交付前状态**，合同台账 2 项未回传 → 暂列 **P1**，交付并回传合同后升 **P0**。其证 `LIC-202610-QMOT` **含 `domain` claim**，而工单表无 `domain` 列 → **续期必须人工重签，不得走 UI 一键签发**（否则静默丢 domain）。
 2. **心跳归一方向修正（2026-10-07，重要）**：此前一度建议"保留 A（heartbeat.ziwi.cn:8091）为唯一后端、B 降级为看板"——**方向错误**，因为唯一真实租户 `dna.ecms` 走的是 **B**（`cloud.ziwi.cn/api/v1/platform/heartbeat`）。**正确方向：以 B 为权威，A 改造为兼容 B 或逐步下线；任何情况下不动 B 的协议与 license_key 校验。**
 3. 任何涉及心跳/鉴权/数据库的改造，执行前必须：① dry-run 差异清单 ② tar 快照 ③ 确认 P0 两条链路不受影响 ④ 主理人明确指令。
 
@@ -265,6 +269,7 @@
 | 2 | `ecms-demo` 独立租户（`ecms.ziwi.cn` 演示站） | ✅ 已建 `LIC-202610-DEMO`：tenant `ecms-demo` / "知微能碳·演示" / product `ecms` / tier `demo` / `deploy_mode=saas` / approved+active / 到期 **2027-10-07** / **不签发 license_key**（SaaS 走 JWT 身份）/ 未建 cloud 账号（密码不经手，由 ecms 团队自助注册） |
 | 3 | `ecms-dna.product` 规范化 | ⚠️ **经复核无需修改**：用 psql `-A` 无对齐模式复查确认 `product` 本就是 `ecms`、`ticket_type=new`、`status=approved` 均正常。此前"product 是中文"系 **psql 中文列宽导致的误读**——那句中文实际是 license_key JWT payload 内的 `tenant_name`。教训：**查 PG 中文数据一律用 `-A -F' | ' -t`**，勿按对齐竖线数列 |
 | 4 | `ecms-demo.current_expires_at` 归零 | ✅ 已改 NULL，与既有 4 条一致。依据：`renew_license()` 以 **`requested_expires_at`** 为续期基线（`platform_service.py:448-465`），`current_expires_at` 不参与续期判断 |
+| 5 | `ecms-xgn` 离线 license 签发（2026-10-19 主理人批准，仅签此一家） | ✅ `LIC-202610-QMOT`（`license_id=95066a09-2f69-43b6-b482-c461796749b4`）：tenant `ecms-xgn` / `扬州新概念电气有限公司 \| 新概念电气能碳管理系统` / ecms / tier `pro` / seats `20`（合同未回传，暂定）/ `deploy_mode=private`（口径=独立实例托管于我方 CVM，非客户机房）/ approved+active / `iat=1792425600`→`exp=1823961599`（2026-10-20 00:00:00 ~ 2027-10-19 23:59:59 CST）/ **含 `domain=yzxgn.ecms.ziwi.cn`** / `modules`·`max_devices` **未扩展** / key sha256 `fd1b6a45…6649e`（完整值见回执）。⚠️ 该 key 由**一次性脚本**签发（现有 `issue_license_key` 固定 8 项 claims，不含 domain）→ **UI 重签会丢 domain**。`ecms-dna` 未触碰（`license_key_issued_at` 仍 `2026-08-11 09:17:24Z`）。回执：`requests/ecms-xgn接入申请-回执-20261019.md` |
 
 **heartbeat 门禁账本现状**：`mfg-staging/mfg`(active, 2026-12-31)、`sch-0001/school`(active)、`test-school-uuid/school`(none 测试残留)。
 **仍未接入**：mfg1 容器 `HEARTBEAT_API_KEY`/`TENANT_ID`/`DEPLOYMENT_ID` 仍为空 → 心跳未跑（需 mfg 小组或主理人配 env，属重启容器操作）。
