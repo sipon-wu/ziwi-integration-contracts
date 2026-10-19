@@ -364,3 +364,26 @@
 **待客户确认（已不阻塞签发）**：签约日期、合同期月数、席位数 3 项未回传。**有效期已于 2026-10-19 20:30 敲定：从 2026-10-20 起整一年 ⇒ `iat=1792425600` / `exp=1823961599`，不再暂定**。仅 `seats=20` 仍为暂定（代码不校验，仅台账）。若受理方内部规范要求「必须有合同才能出证」，请回「等合同」，我方先以软模式交付，合同确认后重签。
 
 **心跳**：本次**不申请**（客户未确认是否纳入，`heartbeat.enabled=false`）。若后续纳入，走现有 B 服务 `POST https://cloud.ziwi.cn/api/v1/platform/heartbeat`（用 `license.key` 自证身份），**无需额外凭据**。
+
+## 🚀 cloud 运营控制台 2026-10-19 首次真正上线
+
+**此前的真实状态**：`cloud.ziwi.cn` 自 2026-07-29 起镜像未重建，首页实际是**教学系统旧构建**（`<title>知微教学</title>`、`#root`、`AnalyticsPage`/`AssignmentBuilder` 等 chunk），运营控制台**从未上线**；源码虽已 rsync 到位（3 个关键文件 md5 与本地仓库一致），但镜像未重编。
+
+**本次发布（`ziwi_cloud@6ab0168` + `492d462`）**：
+
+| 能力 | 说明 |
+|---|---|
+| `domain` 落库 | `license_tickets.domain`（启动时 `ADD COLUMN IF NOT EXISTS` 自动迁移）；建单可填并归一化；**签发从库读取**；**续期继承** |
+| 签发幂等 | 已签发工单重复签发返回**原证**，不再覆盖 → 彻底消除"点一下静默丢 domain" |
+| 查看 / 复制 / 下载 key | 新增 `GET /platform/tickets/{id}/license-key`（只读）；UI 弹层支持复制与下载 `.key`（无换行，sha256 与平台一致） |
+| 驳回 | 新增 `POST .../reject`（必填原因，写备注）；`rejected` 状态终于可达 |
+| 审批收紧 | 后端强制 `paid` 才可审批（此前可跳过财务） |
+| 筛选修复 | 前端 `status` → `status_filter`（此前静默失效） |
+| 产品下拉 | 补 `ecms` |
+| 构建加速 | Dockerfile 改用阿里云 PyPI / npmmirror（官方源在 CVM 实测 12 kB/s，曾卡死构建） |
+
+**数据回填**：`ecms-xgn.domain = yzxgn.ecms.ziwi.cn`（仅此 1 行；`ecms-dna` 保持 NULL，其 key 长度 1261 / 签发时间 2026-08-11 均未变）。
+
+**验证**：API 全链路 **23/23 PASS**（真实租户列表/筛选/查看 key/幂等/建单→财务→审批→签发→续期→驳回/鉴权/P0 回归）；浏览器 UI **14/14**（含 6 张真实工单渲染、筛选、key 弹层 1312 字符、续期与驳回弹层、实例页、收款页、无 JS 异常）。
+
+**回滚**：`docker tag cloud-idp-{backend,frontend}:rollback-20261019` 已就绪，还原即 `docker compose up -d backend frontend`（重打 tag 后）。
