@@ -13,6 +13,7 @@
 | mfg (WMS) | 已移交·自闭环就绪 | workbuddy | 2026-07-12 方案 A 完成：workbuddy 获 CVM root SSH key + `deploy.sh` 推 github `c21bc65`；预发布已对齐 `origin/main 336899f`（含 N3 修复）、`mfg1-backend` healthy、DB 未动 | workbuddy 自验 key 连通性 + `./deploy.sh` 跑通；闭环 N5 过账/流水（真 token + 对账探针）；修探针路径 `/wms/*`→`/api/v1/wms/*`；过 GATE 后置 `Released` |
 | cloud / license 线 | 归属变更·方案已对齐 + **代码仓独立化** + **双源清理** | **codebuddy**（2026-07-27 用户拍板，自 workbuddy 移回） | 2026-07-27 完成三方对齐（详见下方决策记录）：school 侧两篇方案修订至 v0.6/v1.1，mfg 仓 v0.2 草案标记过时；**mfg 接入 cloud 契约新增 §I「License 查询与同步接口（预留·Phase 2）」**（`GET /api/v1/tenants/{tenant_id}/licenses` + 本地字段 + 心跳同步机制）。**2026-08-12 追加**：cloud 后端建独立 GitHub 仓 `sipon-wu/ziwi_cloud`（原游离态 CVM `/opt/cloud-idp/backend` 已接本地 git + 备份 + 推送）；**续写脉络**（不另起山头）：归属变更与 2026-08 进展见 `contracts/mfg接入cloud接口契约.md` 头部「⚠️ 归属变更提示」+ §D.4 心跳服务端实现；git 工作流（方案 A）落到 `runbooks/CVM部署通用规范与坑清单.md` G3 坑下。**2026-08-12 双源清理**（铁律落地）：CVM 上已被 GitHub 契约取代的对接类旧 md 已删除——`/opt/ziwi/mfg/docs/` 下 `cloud-jwt-integration-guide.md` / `multi-product-platform-integration.md` / `school接入cloud接口契约模板.md`，及 `/opt/heartbeat/INTEGRATION.md` / `产品规格.md`；mfg 自身业务文档（产品规格/架构/WMS 等）保留未动 | cloud License 服务/DB（Phase 2）建设；§I 接口落地实现；License 同步通道（webhook vs 心跳）待拍板 |
 | SSL 证书统一管理 | 已收口·自动续期恢复 | workbuddy | 2026-10-04：①通配符 `*.ziwi.cn` DNS-01 续期链路修复（旧 Tencent Key 变量名错配致 12-06 必断，已修正 account.conf 密钥命名并强制续期，到期延至 2027-01-02）；②全站证书合并收口（通配符 SAN 扩含 `*.ecms.ziwi.cn` 覆盖 dna.ecms，删除 ecms/mfg/school/dna.ecms/apex 共 5 张独立证，续期对象 7→2，均先备份） | 商用 apex `ziwi.cn` 2026-11-04 到期待续（用户"到时候再说"）；已登记 deploy-log 待 codebuddy(mfg/ecms/school) 确认 |
+| ecms 私有化实例 | **xgn 已上线·待 license** | workbuddy | 2026-10-19：首个新租户 xgn（扬州新概念电气）上线，`yzxgn.ecms.ziwi.cn` 已解析通达，前端/后端/nginx/28 表空库全就绪，双默认账号 admin+guest 已配；licenses 走离线 RS256 模型，当前软模式 | **待 codebuddy 签发 `license.key`**（见 `requests/ecms-xgn接入申请-License-20261019.md`）；客户合同 3 项（签约日期/合同期/席位）未回传 |
 
 ## 今日服务器策略沉淀（已推 github `a3959f8`，workbuddy 须 pull）
 - 新建 `runbooks/CVM部署通用规范与坑清单.md`：权限模型 / 部署副本分离 / 只读 github key / 容器名冲突 / 探针路径纪律 / 完成门槛 DoD
@@ -306,3 +307,38 @@
 > 4. **License 已就绪**：cloud 工单 `LIC-202607-GZ8M`（`mfg-staging`/`mfg`、active、到期 2026-12-31、key 已签发），心跳门禁账本镜像记录**已建**。mfg1 侧只差配 `HEARTBEAT_API_KEY` / `HEARTBEAT_TENANT_ID` / `HEARTBEAT_DEPLOYMENT_ID`（`TENANT_ID` 用 **`mfg-staging`**）并重启容器。
 > 5. **两点提醒**：① 心跳服务端**只有一把全局 key**，无法按部署发放，请勿外传；② 心跳服务端 A（`heartbeat.ziwi.cn`）与 cloud 侧 B（`cloud.ziwi.cn/api/v1/platform/heartbeat`）**归一方向为「以 B 为权威、A 兼容或下线」**（因唯一真实租户 `ecms-dna` 在 B 上），**A 侧客户端暂按现状对接即可，不要自行改协议**。
 > 6. 完整回执见 `requests/mfg接入申请-回执-20261007.md`（顶部有逐项状态摘要表）。
+
+---
+
+## 📨 ecms-xgn License 签发申请（2026-10-19，WorkBuddy → codebuddy，待受理）
+
+> **完整申请见 `requests/ecms-xgn接入申请-License-20261019.md`**（含回执位，请受理方填写）。
+> 性质：**按既有契约申请凭据签发**，不重开策略讨论。
+
+**背景实况（自查）**：ECMS 首个新租户 **xgn（扬州新概念电气有限公司）** 2026-10-19 完成部署上线，`yzxgn.ecms.ziwi.cn` 已解析、公网可达、TLS 通配符已覆盖。实例当前软模式运行（`LICENSE_NOT_FOUND (mode=soft)`），不阻断启动，但交付客户前必须持证。
+
+**与 mfg 的关键差异**：ECMS 是**离线颁发 + 本地 RS256 验签**模型——实例不联网、不回拨，只读本地 `license.key` + 共用 `public.pem` 自行验签。**要的是一份 JWT 文件，不是 API Key。**
+
+**申请项（唯一）**：签发 `license.key`
+
+| 字段 | 取值 |
+|---|---|
+| `tenant_id` | `ecms-xgn` |
+| `tenant_name` | `扬州新概念电气有限公司 \| 新概念电气能碳管理系统` |
+| `products` / `tier` / `deploy_mode` | `["ecms"]` / `pro` / `private` |
+| `seats` | `20`（暂定，合同未确认；代码不校验，仅台账） |
+| **`domain`** | **`yzxgn.ecms.ziwi.cn`（本次新增要求）** |
+| `iat` / `exp` | `1792425600` / `1823961599`（2026-10-20 ~ 2027-10-19 CST，12 个月） |
+| header | `{"alg":"RS256","kid":"key_v1","typ":"JWT"}`，沿用现有共用 `public.pem`，**无需新公钥** |
+
+字段命名依据：直接解码现网 `ecms-dna` 的 `license.key` payload 得出，结构完全一致，仅补 `domain`。
+
+**新要求说明（`domain`）**：`verify.py` 早已实现 domain 校验分支（期望值取实例 env `INSTANCE_DOMAIN`），但 `ecms-dna` 那张 key 没有 `domain` 字段，导致校验**从未生效**。xgn 是新实例，从此张开始启用域名绑定，防 key 跨实例复用。**兼容性已确认**：判 `DOMAIN_MISMATCH` 的条件是「两者都存在且不相等」⇒ 旧证不失效、demo/dna 无需重签。若 cloud 暂不支持签发 `domain`，**请明确回「暂不支持」**，我方按无 domain 的 key 先上线，不为此阻塞交付。
+
+**明确不需要**：① 任何私钥；② 从 `ecms-dna` 复制既有 `license.key`——该借用路径已于 2026-10-19 从 `verify.py` 删除（原硬编码兜底会让缺证实例静默借用 DNA 证书，租户隔离形同虚设）。
+
+**需回执**：`license_id` / `ticket_no` / 最终 `iat`·`exp` / 是否含 `domain` / `license.key` 的 sha256 / 是否扩展 `modules`·`max_devices`。
+
+**待客户确认（可能影响签发依据）**：签约日期、合同期月数、席位数 3 项未回传。当前按「12 个月 / 20 席位 / iat=2026-10-20」暂定。若受理方要求严格按合同签发，请回「等合同」，我方先以软模式交付，合同确认后重签。
+
+**心跳**：本次**不申请**（客户未确认是否纳入，`heartbeat.enabled=false`）。若后续纳入，走现有 B 服务 `POST https://cloud.ziwi.cn/api/v1/platform/heartbeat`（用 `license.key` 自证身份），**无需额外凭据**。
