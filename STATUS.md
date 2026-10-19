@@ -260,6 +260,8 @@
 | `mfg-staging` | `mfg1.ziwi.cn` | CVM `/opt/ziwi/mfg` | WorkBuddy/mfg | 2026-07-30 | 2026-12-31 | — | 否（env 全空） | 已签发但从未使用 | — |
 | `dazhou_tc_yixiao` | `school.ziwi.cn` | CVM `/opt/zhiwei` | school 小组 | 2026-07（测试租户） | 2027-12-31 | — | 否 | 无证（CloudLogin） | — |
 
+> **xgn 实测备注（2026-10-19，WorkBuddy 提供）**：unit 已含 `LICENSE_DIR` 与 `INSTANCE_DOMAIN=yzxgn.ecms.ziwi.cn`（值精确）、无 drop-in 覆盖 → 装证后仅需 restart；vhost root 为 `/var/www/xgn/ecms`，key 不在 web root 内，公网取到的是 SPA 兜底页。
+
 ### 🔒 P0 保护规则（生产在用，最高优先级）
 
 1. **P0 只有一个真实租户**：`ecms-dna` / `dna.ecms.ziwi.cn`（德耐尔，**目前唯一真实客户**，走 cloud B 心跳链路 + license_key 自证）。其协议、鉴权、密钥、数据**绝不主动改动**。
