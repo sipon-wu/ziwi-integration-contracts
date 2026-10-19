@@ -212,6 +212,8 @@
 
 ## 🔎 License 现状核实（2026-10-07 实测，License 发放职责范围内）
 
+> **2026-10-19 起，一切 License 事项（申请/签发/交付/续期/失效）遵循 `contracts/License发放协同规则-v1.md` v1.0**；申请统一用模板 `requests/_模板-License申请.md`。三条产品线均适用。
+
 **cloud `license_tickets` 全表 6 条**（`license_key` = 私有化/预发布实例自证身份用；2026-10-19 新增 `ecms-demo` 与 `ecms-xgn`）：
 
 | ticket_no | tenant_id | 产品 | 状态 | 到期 | key | 实际使用情况 |
@@ -245,6 +247,18 @@
 | ecms demo | `ecms.ziwi.cn` | `ecms-demo`（知微能碳·演示；2026-10-07 建） | ecms | `LIC-202610-DEMO` approved/active 到期 2027-10-07 | 无（按策略不签） | 演示站；SaaS 走 JWT 身份链路 |
 | **ecms 生产（新租户）** | `yzxgn.ecms.ziwi.cn` | `ecms-xgn`（扬州新概念电气，**我方 CVM 托管 + 独立目录 + 独立库**，即 ECMS 口径的 `private`） | ecms | `LIC-202610-QMOT` approved/active 到期 **2027-10-19** | 已签发 2026-10-19（**含 `domain`**） | 交付前状态：软模式；`INSTANCE_DOMAIN` 配置后 domain 校验才生效 |
 | mfg 生产 | `mfg.ziwi.cn` | **未建**（未部署） | mfg | 无 | — | 待开立 |
+
+### 📇 实例台账（R5：接入方登记，平台季度核对）
+
+> 每张 License 对应一行；新实例 **24 小时内**补齐。缺失或与 `license_tickets` 不一致 → 按 R10 暂停续签。
+
+| tenant_id | 域名 | 部署位置 | 负责人 | 部署日 | 到期 | 硬/软 | 心跳 | 证 sha256 | 最后验证日 |
+|---|---|---|---|---|---|---|---|---|---|
+| `ecms-dna` | `dna.ecms.ziwi.cn` | `/var/www/dna/ecms-backend` | WorkBuddy/ECMS | 2026-08-11 | 2028-08-11 | 硬（据 ECMS README，待确认） | 是（B 服务，现 offline） | 未记录（key 1261 字符） | 2026-08-11 |
+| `ecms-xgn` | `yzxgn.ecms.ziwi.cn` | `/var/www/xgn/ecms-backend` | WorkBuddy/ECMS | 2026-10-19 | 2027-10-19 | 软 | 否（申请 §三.C 暂不接） | `fd1b6a45…6649e`（全长见回执） | 2026-10-19 |
+| `ecms-demo` | `ecms.ziwi.cn` | — | WorkBuddy/ECMS | — | 2027-10-07 | 软 | 否 | 无证（SaaS 走 JWT） | — |
+| `mfg-staging` | `mfg1.ziwi.cn` | CVM `/opt/ziwi/mfg` | WorkBuddy/mfg | 2026-07-30 | 2026-12-31 | — | 否（env 全空） | 已签发但从未使用 | — |
+| `dazhou_tc_yixiao` | `school.ziwi.cn` | CVM `/opt/zhiwei` | school 小组 | 2026-07（测试租户） | 2027-12-31 | — | 否 | 无证（CloudLogin） | — |
 
 ### 🔒 P0 保护规则（生产在用，最高优先级）
 
