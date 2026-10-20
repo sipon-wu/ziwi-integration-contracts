@@ -13,7 +13,7 @@
 |------|------|------|---------|------|
 | mfg (WMS) | 已移交·自闭环就绪 | workbuddy | 2026-07-12 方案 A 完成：workbuddy 获 CVM root SSH key + `deploy.sh` 推 github `c21bc65`；预发布已对齐 `origin/main 336899f`（含 N3 修复）、`mfg1-backend` healthy、DB 未动 | workbuddy 自验 key 连通性 + `./deploy.sh` 跑通；闭环 N5 过账/流水（真 token + 对账探针）；修探针路径 `/wms/*`→`/api/v1/wms/*`；过 GATE 后置 `Released` |
 | cloud / license 线 | 归属变更·方案已对齐 + **代码仓独立化** + **双源清理** | **codebuddy**（2026-07-27 用户拍板，自 workbuddy 移回） | 2026-07-27 完成三方对齐（详见下方决策记录）：school 侧两篇方案修订至 v0.6/v1.1，mfg 仓 v0.2 草案标记过时；**mfg 接入 cloud 契约新增 §I「License 查询与同步接口（预留·Phase 2）」**（`GET /api/v1/tenants/{tenant_id}/licenses` + 本地字段 + 心跳同步机制）。**2026-08-12 追加**：cloud 后端建独立 GitHub 仓 `sipon-wu/ziwi_cloud`（原游离态 CVM `/opt/cloud-idp/backend` 已接本地 git + 备份 + 推送）；**续写脉络**（不另起山头）：归属变更与 2026-08 进展见 `contracts/mfg接入cloud接口契约.md` 头部「⚠️ 归属变更提示」+ §D.4 心跳服务端实现；git 工作流（方案 A）落到 `runbooks/CVM部署通用规范与坑清单.md` G3 坑下。**2026-08-12 双源清理**（铁律落地）：CVM 上已被 GitHub 契约取代的对接类旧 md 已删除——`/opt/ziwi/mfg/docs/` 下 `cloud-jwt-integration-guide.md` / `multi-product-platform-integration.md` / `school接入cloud接口契约模板.md`，及 `/opt/heartbeat/INTEGRATION.md` / `产品规格.md`；mfg 自身业务文档（产品规格/架构/WMS 等）保留未动 | cloud License 服务/DB（Phase 2）建设；§I 接口落地实现；License 同步通道（webhook vs 心跳）待拍板 |
-| SSL 证书统一管理 | 已收口·自动续期恢复 | workbuddy | 2026-10-04：①通配符 `*.ziwi.cn` DNS-01 续期链路修复（旧 Tencent Key 变量名错配致 12-06 必断，已修正 account.conf 密钥命名并强制续期，到期延至 2027-01-02）；②全站证书合并收口（通配符 SAN 扩含 `*.ecms.ziwi.cn` 覆盖 dna.ecms，删除 ecms/mfg/school/dna.ecms/apex 共 5 张独立证，续期对象 7→2，均先备份） | 商用 apex `ziwi.cn` 2026-11-04 到期待续（用户"到时候再说"）；已登记 deploy-log 待 codebuddy(mfg/ecms/school) 确认 |
+| SSL 证书统一管理 | 已收口·自动续期恢复 | workbuddy | 2026-10-04：①通配符 `*.ziwi.cn` DNS-01 续期链路修复（旧 Tencent Key 变量名错配致 12-06 必断，已修正 account.conf 密钥命名并强制续期，到期延至 2027-01-02）；②全站证书合并收口（通配符 SAN 扩含 `*.ecms.ziwi.cn` 覆盖 dna.ecms，删除 ecms/mfg/school/dna.ecms/apex 共 5 张独立证，续期对象 7→2，均先备份）。**2026-10-20**：商用 apex `ziwi.cn`/`www.ziwi.cn` 经腾讯云控制台续期（TrustAsia，KiKi 操作）+ 本机 `deploy_ssl_cert.sh` 部署，到期 **2026-11-04 → 2027-01-17**，key↔cert 匹配、SAN 覆盖，nginx -t + reload + 在线验证全绿，监控告警归零 | 已登记 deploy-log 待 codebuddy(mfg/ecms/school) 确认；apex 商用证下次到期 **2027-01-17** |
 | ecms 私有化实例 | **xgn 已上线·待 license** | workbuddy | 2026-10-19：首个新租户 xgn（扬州新概念电气）上线，`yzxgn.ecms.ziwi.cn` 已解析通达，前端/后端/nginx/28 表空库全就绪，双默认账号 admin+guest 已配；licenses 走离线 RS256 模型，当前软模式 | **待 codebuddy 签发 `license.key`**（见 `requests/ecms-xgn接入申请-License-20261019.md`）；客户合同 3 项（签约日期/合同期/席位）未回传 |
 
 ## 今日服务器策略沉淀（已推 github `a3959f8`，workbuddy 须 pull）
@@ -75,18 +75,24 @@
 - **执行**：重签通配符（SAN 增 `*.ecms.ziwi.cn`，仍落 `*.ziwi.cn_ecc`，路径不变）；4 个 vhost（ecms/mfg/school/dna.ecms）证书路径改指通配符（备份 `/root/nginx_conf_backup/*.bak.20261004123235`）；`nginx -t` + `nginx -s reload`（注：`systemctl reload` 初次未生效，改用直发信号）；删 5 张独立证（备份 `/root/acme_dead_backup_20261004/`）；清 `/etc/nginx/ssl` 死文件（保留 `ziwi.cn_tc` 商用，备份 `/root/nginx_ssl_dead_backup_20261004/`）。
 - **结果**：`acme.sh --list` 仅在册通配符（Renew 2026-12-03）；9 子域全验证通配符 2027-01-02；apex 商用证 2026-11-04 不动；续期对象 **7 → 2**（通配符 DNS-01 + 商用人工）。
 
-### 三、当前证书健康快照（2026-10-04）
+### 三、当前证书健康快照（2026-10-20 更新）
 | 域名 | 证书 | 到期 | 状态 |
 |------|------|------|------|
-| ziwi.cn / www.ziwi.cn | 商用 TrustAsia | 2026-11-04 | 待续（用户"到时候再说"） |
+| ziwi.cn / www.ziwi.cn | 商用 TrustAsia | **2027-01-17** | ✅ OK（2026-10-20 续期部署，监控 `[OK] 89天`） |
 | cloud / heartbeat / mfg / mfg1 / school / school1 / ecms / dna.ecms | 通配符 `*.ziwi.cn` | 2027-01-02 | OK，DNS-01 自动续期已恢复 |
 
 ### 四、待办 / 注意
-1. 商用 apex `ziwi.cn` 2026-11-04 到期——需走腾讯云控制台续期（用 `deploy_ssl_cert.sh`）。
+1. ~~商用 apex `ziwi.cn` 2026-11-04 到期——需走腾讯云控制台续期（用 `deploy_ssl_cert.sh`）。~~ ✅ **已完成 2026-10-20**（腾讯云控制台续期 + `deploy_ssl_cert.sh` 部署，到期 2027-01-17）。下次到期 2027-01-17，届时需要再次走控制台续期。
 2. 通知 codebuddy：cloud.ziwi.cn 证书已并入通配符（SAN 仍覆盖），其 IdP 不受影响；请确认 IdP 侧无独立证书待处理。
 3. `check_ssl_expiry.sh` 今早 11:53 失败尝试触发的 48h 一次性告警已自动消除。
 4. 若短信指向腾讯云控制台中**另一张为 cloud.ziwi.cn 单独申请的证书**（非本机 LE 通配符），需在控制台侧另行处理。
 5. 本机 git 到 GitHub 连通性波动（schannel HTTPS 偶发 TLS 握手失败），本次改用 SSH 专用 deploy key `ziwi_integration_deploy_key` 提交。
+
+### 五、商用 apex ziwi.cn 续期部署（2026-10-20，WorkBuddy / Kane 授权）
+- **触发**：Kane 收到 cloud.ziwi.cn「快到期」短信后排查，apex 商用证 `ziwi.cn`/`www.ziwi.cn` 实为 2026-11-04 到期（非通配符，独立 TrustAsia 商用证）。用户让 KiKi 在腾讯云控制台续期，本机从控制台下载 Nginx 格式 zip（4 次重复下载，内容同一张证，serial `1CC1E8BC…27BAC`，SHA256 `13:13:61:AF:…:19:DF`）交 WorkBuddy 部署。
+- **部署**：`deploy_ssl_cert.sh ziwi.cn <zip>` —— 校验 key↔cert 匹配 + SAN 覆盖 → 写入 `/etc/nginx/ssl/ziwi.cn_tc/`（旧证已先备份 `/root/nginx_ssl_backup_20261020/`）→ nginx 配置 ziwi.cn server 块证书路径更新（同路径，备份 `/root/nginx_conf_backup/ziwi.cn.20261020095148.bak`）→ `nginx -t` + `nginx -s reload` → 在线验证。
+- **结果**：对外证书 notAfter=**2027-01-17 23:59:59 GMT**，SAN=`ziwi.cn, www.ziwi.cn`；`www.ziwi.cn` 复测同证；监控 `[OK] 剩余 89 天 CN=ziwi.cn`、`[OK] *.ziwi.cn 74天`、`acme.sh 近期无续期失败`、`汇总: 告警 0 项`。
+- **注意**：apex `ziwi.cn` 不在 acme.sh 管理，**不会自动续期**，下次 2027-01-17 前需再次控制台续期。临时包 `/tmp/ziwi.cn_nginx.zip` 已清理。
 
 ## 📨 mfg 接入申请回执（2026-10-07，codebuddy → WorkBuddy，已受理·待拍板）
 
