@@ -393,3 +393,19 @@
 **验证**：API 全链路 **23/23 PASS**（真实租户列表/筛选/查看 key/幂等/建单→财务→审批→签发→续期→驳回/鉴权/P0 回归）；浏览器 UI **14/14**（含 6 张真实工单渲染、筛选、key 弹层 1312 字符、续期与驳回弹层、实例页、收款页、无 JS 异常）。
 
 **回滚**：`docker tag cloud-idp-{backend,frontend}:rollback-20261019` 已就绪，还原即 `docker compose up -d backend frontend`（重打 tag 后）。
+
+## 🔒 nginx 默认 server 收口（2026-10-21）
+
+**问题**：nginx 443 端口无显式 `default_server`，首个 `listen 443` 块 `heartbeat.ziwi.cn` 成为隐式默认 → 任何未在 nginx 精确配置、却解析到本机 IP 的域名，都会被 heartbeat 兜底接管（此前 `yz_xgn.ecms.ziwi.cn` 即因此"指向 license 心跳管理中心"）；80 端口旧兜底块还把所有未匹配域名 301 跳到 `www.ziwi.cn`。
+
+**变更**（CVM `193.112.163.147`，仅 nginx，未动证书/后端）：
+- 新增 `/etc/nginx/conf.d/zz-catch-all-default.conf`：`listen 80/443 ssl default_server; server_name _; return 444;` —— 未配域名一律直接断连（444 = 关闭连接，无响应）。
+- `sites-enabled/ziwi.cn`：删除旧"IP 直接访问默认"兜底块（其 `default_server` 让位给 catch-all）；保留 `ziwi.cn/www` 的 80/443 精确配置。
+- 同步 `sites-enabled/ziwi.cn` → `sites-available/ziwi.cn`（消除两者长期漂移：enabled 实为实体文件而非符号链接）。
+- reload：`nginx -s reload`（注：`systemctl reload` 在本机曾不生效）。
+
+**验证**：
+- 未配域名 `testxyz.ecms.ziwi.cn`（HTTPS/HTTP）→ `http_code=000`（444 关闭连接）✅
+- 合法域不受影响：`heartbeat.ziwi.cn` 301、`www.ziwi.cn` 200、`ziwi.cn` http 200 ✅
+
+**留痕性质**：属运维加固，非契约文档变更；heartbeat/license 线 vhost 未改动（仅不再被兜底充当默认）。
