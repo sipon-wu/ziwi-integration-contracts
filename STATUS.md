@@ -409,3 +409,9 @@
 - 合法域不受影响：`heartbeat.ziwi.cn` 301、`www.ziwi.cn` 200、`ziwi.cn` http 200 ✅
 
 **留痕性质**：属运维加固，非契约文档变更；heartbeat/license 线 vhost 未改动（仅不再被兜底充当默认）。
+
+### yzxgn vhost 禁用（2026-10-21 23:51）
+- **原因**：`yzxgn.ecms.ziwi.cn` 的 DNS A 记录已从 DNSPod 删除（权威 3 源确认 Non-existent），但用户本地/上游递归 DNS 仍缓存旧 IP（TTL 600s 未过期），导致"删了还能访问"。且该域在 nginx 属**精确配置** vhost，catch-all(444) 不作用于它。
+- **操作**：`rm /etc/nginx/sites-enabled/yzxgn.ecms.ziwi.cn`（保留 `sites-available/yzxgn.ecms.ziwi.cn` 配置文件，未删），`nginx -s reload`。
+- **效果**：现 `yzxgn` 落到 catch-all → 444（服务器侧 + 强指IP 实测 `http_code=000`）；合法域 `heartbeat` 301 / `www.ziwi.cn` 200 不受影响。
+- **恢复方式**：用户通知后再 `ln -s /etc/nginx/sites-available/yzxgn.ecms.ziwi.cn /etc/nginx/sites-enabled/` + `nginx -s reload` 即可。后端 8082（ecms-xgn）未停，仅域名入口关闭。
