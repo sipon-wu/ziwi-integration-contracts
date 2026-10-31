@@ -421,3 +421,11 @@
 - **影响**：DNSPod 暂停 `yzxgn` 解析后，内网设备（含换电脑/换浏览器）仍可访问；手机 5G 直连已断，证明公网侧无残留。已在服务器侧禁用 vhost 断连，当前不影响访问控制。
 - **待确认**：该清单疑似**多环境协同开发测试期间由脚本批量写入**（用户推测为 Mac 侧操作；协同仓记录 `sipon@192.168.0.103` 为本机 Mac，与用户同处 `192.168.0.x` 网段）。请在 Mac 侧自查部署/初始化脚本及是否登录过 `192.168.1.1` 网关；若确认，请清理**源头脚本**，否则重跑会再次写回。
 - **风险**：该清单覆盖所有 ziwi 域名，**服务器 IP 变更时内网访问会继续指向旧 IP**，迁移前须一并清理。
+
+### ecms.ziwi.cn vhost 禁用（2026-10-31 22:37）
+
+- **背景**：用户确认 `ecms.ziwi.cn` 为 **DEMO 站**（非生产；生产租户为 `dna.ecms.ziwi.cn`），并将在 DNSPod 侧暂停其解析；服务器侧同步禁用 vhost 兜底断连（不受内网 DNS `192.168.1.1` hosts 清单及各层缓存影响）。
+- **操作**：`rm /etc/nginx/sites-enabled/ecms.ziwi.cn`（软链移除；`sites-available/ecms.ziwi.cn` 1370 字节配置**保留**）+ `nginx -t` 通过 + `nginx -s reload`。
+- **验证（外部实测）**：`ecms.ziwi.cn` 强指 IP → `http_code=000`（落 catch-all 444）✅；**生产租户 `dna.ecms.ziwi.cn` → 200 不受影响** ✅；`heartbeat` 301 / `www.ziwi.cn` 200 正常 ✅；`testxyz` 对照仍 000 ✅。
+- **恢复方式**：`ln -s /etc/nginx/sites-available/ecms.ziwi.cn /etc/nginx/sites-enabled/` + `nginx -s reload`；并在 DNSPod 恢复/重加解析。注意内网 DNS hosts 清单已含 `ecms` 条目，恢复后内网仍会指向本机（如需彻底清理见上节）。
+- **留痕性质**：运维操作，vhost 配置未删，DNS 侧由用户在 DNSPod 暂停。
