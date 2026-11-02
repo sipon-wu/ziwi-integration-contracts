@@ -429,3 +429,4 @@
 - **验证（外部实测）**：`ecms.ziwi.cn` 强指 IP → `http_code=000`（落 catch-all 444）✅；**生产租户 `dna.ecms.ziwi.cn` → 200 不受影响** ✅；`heartbeat` 301 / `www.ziwi.cn` 200 正常 ✅；`testxyz` 对照仍 000 ✅。
 - **恢复方式**：`ln -s /etc/nginx/sites-available/ecms.ziwi.cn /etc/nginx/sites-enabled/` + `nginx -s reload`；并在 DNSPod 恢复/重加解析。注意内网 DNS hosts 清单已含 `ecms` 条目，恢复后内网仍会指向本机（如需彻底清理见上节）。
 - **留痕性质**：运维操作，vhost 配置未删，DNS 侧由用户在 DNSPod 暂停。
+- **恢复（2026-11-02 23:31）**：用户通知开放。已 `ln -sf /etc/nginx/sites-available/ecms.ziwi.cn /etc/nginx/sites-enabled/` + `nginx -t` 通过 + `nginx -s reload`。后端 `127.0.0.1:8088`（python3）在监听。**验证**：强指 IP `ecms → 200`；真实 DNS 访问 `ecms → 200`（DNSPod 权威已返回 `193.112.163.147`）；生产租户 `dna.ecms → 200`、`www.ziwi.cn → 200`、`heartbeat → 301` 均正常；未配域 `testxyz` 对照仍 `000`（catch-all 完好）。
